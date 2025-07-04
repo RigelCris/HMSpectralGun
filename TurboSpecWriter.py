@@ -140,7 +140,7 @@ class TurboSpecWriter:
 
             
         # Write the script file
-        with open(os.path.join(self.launch_path, 'slineturbos.com'), "w") as file:
+        with open(os.path.join(self.launch_path, script_name+'.com'), "w") as file:
             file.write("#!/bin/csh -f\n")
             file.write("\n")
             file.write("# Turbospectrum Script\n")
@@ -244,7 +244,7 @@ class TurboSpecWriter:
             file.write("########################################################################\n")
     
 
-        os.system(f"chmod 777 {os.path.join(self.launch_path, 'slineturbos.com')}")
+        os.system(f"chmod 777 {os.path.join(self.launch_path, script_name+'.com')}")
         
         return script_name
 
