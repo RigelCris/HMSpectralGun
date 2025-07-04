@@ -208,3 +208,4 @@ __marimo__/
 
 # My Custom Ignored Folders
 marcs_generator/
+.DS_Store
