@@ -50,7 +50,10 @@ class HeaderCreator:
 
     def _process_header_lines(self, lines, abun):
         start_line_content = " ELEMENT  ATOMIC NUMBER   LOG(ABUNDANCE)"
-        start_line_index = next(i for i, line in enumerate(lines) if start_line_content in line)
+        try:
+            start_line_index = next(i for i, line in enumerate(lines) if start_line_content in line)
+        except StopIteration as exc:
+            raise ValueError("Unable to find abundance block in Turbospectrum log output.") from exc
         end_line_index = start_line_index + 83  # Regola in base alla struttura del file
 
         header_lines = lines[start_line_index:end_line_index + 1]
@@ -65,12 +68,30 @@ class HeaderCreator:
             processed_header_lines.append(new_line)
         return processed_header_lines
 
-    def create_combined_header(self, namefile, model, met, alpha, elem, deltaabu, lam_min, lam_max, xi, isotopic_n, isotopic_val, keyw, deltalam, res=None):
+    def create_combined_header(
+        self,
+        namefile,
+        model,
+        met,
+        alpha,
+        elem,
+        deltaabu,
+        lam_min,
+        lam_max,
+        xi,
+        isotopic_n,
+        isotopic_val,
+        keyw,
+        deltalam,
+        res=None,
+        log_filename='log'
+    ):
         chem = self._chemical_keyword(keyw)
         header_lines = self._prepare_header_lines(model, chem, met, alpha, xi, deltalam, lam_min, lam_max, isotopic_n, isotopic_val, res)
 
         # Leggi il contenuto del file di log
-        with open(os.path.join(self.launch_path, 'log'), 'r') as file:
+        log_path = os.path.join(self.launch_path, log_filename)
+        with open(log_path, 'r') as file:
             lines = file.readlines()
 
         abun = self._modify_abundances(elem, deltaabu, alpha)

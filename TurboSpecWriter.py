@@ -44,7 +44,7 @@ class TurboSpecWriter:
         else:
             print("CONTOPAC directory already exists.")
 
-    def writer(self, model_name, metallic, alpha, lam_min, lam_max, turbvel, linespec, lineseqw, elem, abu, isotopic_n, isotopic_val, keyw, el, ext, deltalam='0.01', interp='True', NLTE=False):
+    def writer(self, model_name, metallic, alpha, lam_min, lam_max, turbvel, linespec, lineseqw, elem, abu, isotopic_n, isotopic_val, keyw, el, ext, deltalam='0.01', interp='True', NLTE=False, abundance_tag=''):
         """
         Writes a script for running the Turbospectrum software with specific parameters.
 
@@ -74,18 +74,31 @@ class TurboSpecWriter:
             raise ValueError("model_name should be a string")
 
         # Determine the model name format using regex
-        if interp.lower() in ('false'):
-            match = re.match(r'([sp]\d+)_g([+-]?\d\.\d)_z([+-]?\d\.\d+)_a([+-]?\d\.\d+)\.mod$', model_name)
-            if match:
-                print('Spherical model') if match.group(1)[0] == 's' else print('Plane Parallel model')
-                TT = match.group(1)[1:]
-                gg = float(match.group(2))
+        interp_mode = str(interp).strip().lower()
+        model_name_format = model_name.split(".mod")[0]
+        GG = None
+
+        if interp_mode == 'false':
+            # Explicit models can contain additional tags (m1.0_t02_st_...).
+            # We only need log(g) to set the spherical flag robustly.
+            gravity_match = re.search(r'_g([+-]?\d+(?:\.\d+)?)', model_name)
+            if gravity_match:
+                gg = float(gravity_match.group(1))
                 GG = f"{gg:.2f}"
-                model_name_format = f't{TT}_g{GG}'
+
+                # Preserve legacy short-format output naming when that format is used.
+                legacy_match = re.match(
+                    r'([sp]\d+)_g([+-]?\d+(?:\.\d+)?)_z([+-]?\d+(?:\.\d+)?)_a([+-]?\d+(?:\.\d+)?)\.mod$',
+                    model_name
+                )
+                if legacy_match:
+                    print('Spherical model') if legacy_match.group(1)[0] == 's' else print('Plane Parallel model')
+                    TT = legacy_match.group(1)[1:]
+                    model_name_format = f't{TT}_g{GG}'
             else:
-                print('Model not found')
-                pass
-        elif interp.lower() in ('true'):
+                raise ValueError(f"Invalid explicit model name format: {model_name}")
+
+        elif interp_mode == 'true':
             match = re.match(r'T(\d+)_G([pm]\d+\.\d+)_.*_Z([pm]\d+\.\d+)\.interpol', model_name)
             if match:
                 TT = float(match.group(1))
@@ -95,19 +108,19 @@ class TurboSpecWriter:
             else:
                 raise ValueError(f"Invalid model name format: {model_name}")
 
-        elif interp.lower() in ('nearest'):
+        elif interp_mode == 'nearest':
 #           print('Modello scritto co i piedi?')
 #           model_name_format = model_name.split(".mod")[0]
-            match = re.match(r'T(\d+)_G([pm]\d+\.\d+)_.*_Z([pm]\d+\.\d+)', model_name)
+            #match = re.match(r'T(\d+)_G([pm]\d+\.\d+)_.*_Z([pm]\d+\.\d+)', model_name)
+            match = re.match(r'T(\d+)_G([pm]\d+\.\d+)', model_name)
             if match:
-                print('Spherical model') if match.group(1)[0] == 's' else print('Plane Parallel model')
-                TT = match.group(1)[1:]
                 gg = float(match.group(2)[1:]) if match.group(2)[0] == 'p' else -float(match.group(2)[1:])
-                GG = f"{gg:.2f}"    
+                GG = f"{gg:.2f}"
                 model_name_format = model_name.split(".mod")[0] #f't{TT}_g{GG}'
             else:
-                print('Model not found')
-                pass
+                raise ValueError(f"Invalid nearest model name format: {model_name}")
+        else:
+            raise ValueError(f"Unsupported interp mode: {interp}")
 
 
         # Determine spherical parameter
@@ -129,14 +142,19 @@ class TurboSpecWriter:
         turbvel = f"{float(turbvel):.2f}"
         # Generate script name
         if (keyw.lower() == 'yes'):
-            script_name = f"{model_name_format}_{lam_minw}_{lam_maxw}_xi{turbvel}_z{sgnm}{metallic_formatted}_a{sgna}{alpha_formatted}_only{el}.{ext}"
+            script_name = f"{model_name_format}_{lam_minw}_{lam_maxw}_xi{turbvel}_z{sgnm}{metallic_formatted}_a{sgna}{alpha_formatted}_only{el}{abundance_tag}.{ext}"
         else:
-            script_name = f"{model_name_format}_{lam_minw}_{lam_maxw}_xi{turbvel}_z{sgnm}{metallic_formatted}_a{sgna}{alpha_formatted}.{ext}"
+            script_name = f"{model_name_format}_{lam_minw}_{lam_maxw}_xi{turbvel}_z{sgnm}{metallic_formatted}_a{sgna}{alpha_formatted}{abundance_tag}.{ext}"
 
-        # Check if the spectrum file already exists
-        if exists(os.path.join(self.save_path, script_name)):
-            print("Spectrum already exists")
-            return 'STOP'
+        # Check if the spectrum file already exists.
+        # Empty files can be leftovers from failed runs and must be regenerated.
+        out_path = os.path.join(self.save_path, script_name)
+        if exists(out_path):
+            if os.path.getsize(out_path) > 0:
+                print("Spectrum already exists")
+                return 'STOP'
+            print("Existing empty spectrum found, regenerating")
+            os.remove(out_path)
 
             
         # Write the script file
@@ -168,9 +186,9 @@ class TurboSpecWriter:
             file.write(f"set ext = '{ext}'\n")
             if keyw.lower() == 'yes':
                 file.write(f"set xel = '{el}'\n")
-                file.write(f"set SUFFIX = _${{lam_minw}}_${{lam_maxw}}_xi${{TURBVEL}}_z${{sgnm}}${{METALLICn}}_a${{sgna}}${{alphan}}_only${{xel}}\n")
+                file.write(f"set SUFFIX = _${{lam_minw}}_${{lam_maxw}}_xi${{TURBVEL}}_z${{sgnm}}${{METALLICn}}_a${{sgna}}${{alphan}}_only${{xel}}{abundance_tag}\n")
             else:
-                file.write(f"set SUFFIX = _${{lam_minw}}_${{lam_maxw}}_xi${{TURBVEL}}_z${{sgnm}}${{METALLICn}}_a${{sgna}}${{alphan}}\n")
+                file.write(f"set SUFFIX = _${{lam_minw}}_${{lam_maxw}}_xi${{TURBVEL}}_z${{sgnm}}${{METALLICn}}_a${{sgna}}${{alphan}}{abundance_tag}\n")
             file.write(f"set result = ${{MODELn}}${{SUFFIX}}\n")
             file.write("\n")
             file.write("# Abundances from the model are not used\n")

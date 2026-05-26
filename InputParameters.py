@@ -115,25 +115,59 @@ class InputParameters:
         # Leggi il resto delle righe come dati tabellari
         data_lines = lines[6:]
 
-        # Definisci i tipi di colonna
-        col_types = [str, float, float, float, float, float, str, str, float, float, str, str, str, str, str]
-
         data = []
         for line in data_lines:
             values = line.split()
-            if len(values) != len(col_types):
-                raise ValueError(f"Expected {len(col_types)} columns, but got {len(values)} columns in line: {line}")
-            parsed_values = []
-            for value, col_type in zip(values, col_types):
+            # Formato storico: 15 colonne
+            # Nuovo formato: 17 colonne con override esplicito [X/Fe]
+            # ... extension override_elem override_xfe
+            if len(values) not in (15, 17):
+                raise ValueError(
+                    f"Expected 15 or 17 columns, but got {len(values)} columns in line: {line}"
+                )
+
+            def cast_value(value, col_type):
                 value = value.strip()
                 if value == '*':
-                    parsed_values.append(value)
-                else:
-                    parsed_values.append(col_type(value))
+                    return value
+                return col_type(value)
+
+            # Colonne base (15)
+            parsed_values = [
+                cast_value(values[0], str),    # Model
+                cast_value(values[1], float),  # [Fe/H]
+                cast_value(values[2], float),  # [a/Fe]
+                cast_value(values[3], float),  # lam_i
+                cast_value(values[4], float),  # lam_f
+                cast_value(values[5], float),  # xi
+                cast_value(values[6], str),    # chemistry
+                cast_value(values[7], str),    # sampl
+                cast_value(values[8], float),  # RES
+                cast_value(values[9], float),  # resnum
+                cast_value(values[10], str),   # monoelem
+                cast_value(values[11], str),   # linelist_file
+                cast_value(values[12], str),   # abu_file
+                cast_value(values[13], str),   # snr
+                cast_value(values[14], str),   # extension
+            ]
+
+            # Override opzionale [X/Fe]: atomic number + value
+            if len(values) == 17:
+                parsed_values.extend([
+                    cast_value(values[15], float),  # override_elem
+                    cast_value(values[16], float),  # override_xfe
+                ])
+            else:
+                parsed_values.extend(['*', '*'])
+
             data.append(parsed_values)
 
         # Crea un DataFrame
-        columns = ["Model", "[Fe/H]", "[a/Fe]", "lam_i", "lam_f", "xi", "chemistry", "sampl", "RES", "resnum", "monoelem", "linelist_file", "abu_file", "snr", "extension"]
+        columns = [
+            "Model", "[Fe/H]", "[a/Fe]", "lam_i", "lam_f", "xi", "chemistry",
+            "sampl", "RES", "resnum", "monoelem", "linelist_file", "abu_file",
+            "snr", "extension", "override_elem", "override_xfe"
+        ]
         self.df = pd.DataFrame(data, columns=columns)
 
     def read_linelist_file(self, linelist_file):
@@ -161,7 +195,7 @@ class InputParameters:
             tuple: DataFrame delle abbondanze senza Crat, e Crat se esiste.
         """
         abu_file_path = os.path.join(os.getcwd(), abu_file)
-        abu_data = pd.read_csv(abu_file_path, sep='\s+', header=None, names=["AtomicNumber", "AbundanceDifference"])
+        abu_data = pd.read_csv(abu_file_path, sep=r'\s+', header=None, names=["AtomicNumber", "AbundanceDifference"])
         # Estrai Crat se esiste
         Crat = abu_data[abu_data["AtomicNumber"] == 612613]["AbundanceDifference"]
         # Rimuovi Crat dal DataFrame se esiste
@@ -284,23 +318,20 @@ class InputParameters:
         Returns:
             list: Lista di dizionari contenenti il contenuto della lista di righe, le abbondanze scalate e Crat.
         """
-        results = []
-        for index in self.df.iterrows():
-            linelist_file_content = [self.read_linelist_file(linelist_file)]
-            linelist_file_content = [[item.strip() for item in sublist] for sublist in linelist_file_content][0]
+        linelist_file_content = [self.read_linelist_file(linelist_file)]
+        linelist_file_content = [[item.strip() for item in sublist] for sublist in linelist_file_content][0]
 
+        abu_data, Crat = self.read_abu_file(abu_file)
+        atomic_numbers = abu_data['AtomicNumber'].values
+        abundance_diff = abu_data['AbundanceDifference'].values
 
-            abu_data, Crat = self.read_abu_file(abu_file)
-            atomic_numbers = abu_data['AtomicNumber'].values
-            abundance_diff = abu_data['AbundanceDifference'].values
-            
-            met = metallicity
-            logN_abuns = self.solar_reference(atomic_numbers, abundance_diff, met)
-            results = ({
-                'linelist_content': linelist_file_content,
-                'logN_abuns': logN_abuns,
-                'Crat': Crat if len(Crat) > 0 else None
-            })
+        met = metallicity
+        logN_abuns = self.solar_reference(atomic_numbers, abundance_diff, met)
+        results = ({
+            'linelist_content': linelist_file_content,
+            'logN_abuns': logN_abuns,
+            'Crat': Crat if len(Crat) > 0 else None
+        })
         return results
 
     def write_output_spectra_count(self):

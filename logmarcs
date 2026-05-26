@@ -1,0 +1,32 @@
+ *****************************
+ * begining of interpolation *
+ *****************************
+ Interpolation between :
+  this model is SPHERICALLY SYMMETRIC
+model 1  Teff=   3600.  logg= 1.00  z= -1.00
+  this model is SPHERICALLY SYMMETRIC
+model 2  Teff=   3600.  logg= 1.00  z= -1.00
+  this model is SPHERICALLY SYMMETRIC
+model 3  Teff=   3600.  logg= 1.50  z= -1.00
+  this model is SPHERICALLY SYMMETRIC
+model 4  Teff=   3600.  logg= 1.50  z= -1.00
+  this model is SPHERICALLY SYMMETRIC
+model 5  Teff=   3700.  logg= 1.00  z= -1.00
+  this model is SPHERICALLY SYMMETRIC
+model 6  Teff=   3700.  logg= 1.00  z= -1.00
+  this model is SPHERICALLY SYMMETRIC
+model 7  Teff=   3700.  logg= 1.50  z= -1.00
+  this model is SPHERICALLY SYMMETRIC
+model 8  Teff=   3700.  logg= 1.50  z= -1.00
+Interpolation point : Teff=   3681.  logg= 1.25  z= -1.00
+ resample models on common depth basis: tauRoss
+ optimized interpolation applied for standard composition models
+ now calculate rhox
+ now calculate error
+    estimated max error on T =  0.1 %
+   estimated max error on Pe =  2.4 %
+   estimated max error on Pg =  1.3 %
+estimated max error on kappa =  2.3 %
+ now write result
+ spherical models
+ interpolation done

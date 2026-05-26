@@ -4,18 +4,32 @@
 import argparse
 import os
 import time
+import numpy as np
 from tqdm import tqdm
+from mendeleev import element as chemical_element
 
 # Importazione delle classi necessarie dal modulo HMSpectralGun
-from HMSpectralGun.Intro             import  Intro
-from HMSpectralGun.InputParameters   import  InputParameters
-from HMSpectralGun.LineListManager   import  LineListManager
-from HMSpectralGun.ModelMaker        import  ModelMaker
-from HMSpectralGun.TurboSpecWriter   import  TurboSpecWriter
-from HMSpectralGun.HeaderCreator     import  HeaderCreator
-from HMSpectralGun.SpectrumConvolver import  SpectrumConvolver
-from HMSpectralGun.SNR               import  SpectrumNoiseAdder
-from HMSpectralGun.Resampling        import  SpectrumResampler
+try:
+    from HMSpectralGun.Intro             import Intro
+    from HMSpectralGun.InputParameters   import InputParameters
+    from HMSpectralGun.LineListManager   import LineListManager
+    from HMSpectralGun.ModelMaker        import ModelMaker
+    from HMSpectralGun.TurboSpecWriter   import TurboSpecWriter
+    from HMSpectralGun.HeaderCreator     import HeaderCreator
+    from HMSpectralGun.SpectrumConvolver import SpectrumConvolver
+    from HMSpectralGun.SNR               import SpectrumNoiseAdder
+    from HMSpectralGun.Resampling        import SpectrumResampler
+except ModuleNotFoundError:
+    # Fallback per esecuzione diretta dalla cartella HMSpectralGun.
+    from Intro             import Intro
+    from InputParameters   import InputParameters
+    from LineListManager   import LineListManager
+    from ModelMaker        import ModelMaker
+    from TurboSpecWriter   import TurboSpecWriter
+    from HeaderCreator     import HeaderCreator
+    from SpectrumConvolver import SpectrumConvolver
+    from SNR               import SpectrumNoiseAdder
+    from Resampling        import SpectrumResampler
 
 
 
@@ -25,6 +39,21 @@ def parse_arguments():
     parser.add_argument('--input', type=str, default='input.ts', help='The input filename (default: input.ts)')
     parser.add_argument('--progress', action='store_true', help='Show a progress bar')
     return parser.parse_args()
+
+def _read_explicit_xfe_override(row):
+    z_raw = row.get('override_elem', '*')
+    xfe_raw = row.get('override_xfe', '*')
+
+    if z_raw == '*' or xfe_raw == '*':
+        return None, None, ''
+
+    z = int(float(z_raw))
+    xfe = float(xfe_raw)
+    symbol = chemical_element(z).symbol
+    sign = 'p' if xfe >= 0 else 'm'
+    amp = int(round(abs(xfe) * 100))
+    tag = f"_{symbol}{sign}{amp:03d}"
+    return z, xfe, tag
 
 def main(k=0, show_progress=False, verbose=False, pbar=None):
     """Main function to process spectra based on input parameters."""
@@ -66,13 +95,27 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
     # Lettura dei file di abbondanza
     df_abu, _ = params.read_abu_file(df.at[k, 'abu_file'])
     elem, deltaabu = df_abu['AtomicNumber'].to_numpy(dtype=float), df_abu['AbundanceDifference'].to_numpy(dtype=float)
-    isotopic_val = Crat.iloc[0]
+    override_z, override_xfe, override_tag = _read_explicit_xfe_override(df.iloc[k])
+    if Crat is None or len(Crat) == 0:
+        isotopic_n = 0
+        isotopic_val = 0.0
+    else:
+        isotopic_val = Crat.iloc[0]
 
     # Aggiornamento delle abbondanze in base a [a/Fe]
     if df.at[k, '[a/Fe]'] != 0.:
         alpha = df.at[k, '[a/Fe]']
         for element in [8, 12, 14, 16, 20, 22]:
             deltaabu[elem == element] = alpha
+
+    # Priorità massima: override esplicito [X/Fe] da input.ts
+    if override_z is not None:
+        mask = (elem == float(override_z))
+        if mask.any():
+            deltaabu[mask] = override_xfe
+        else:
+            elem = np.append(elem, float(override_z))
+            deltaabu = np.append(deltaabu, float(override_xfe))
 
     abu = params.solar_reference(elem, deltaabu, df.at[k, '[Fe/H]'])
 
@@ -81,7 +124,7 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
     namefile = turbo_spec_writer.writer(model, df.at[k, '[Fe/H]'], df.at[k, '[a/Fe]'], df.at[k, 'lam_i'], df.at[k, 'lam_f'],
                                         df.at[k, 'xi'], linespec, df.at[k, 'snr'], elem, abu, isotopic_n,
                                         isotopic_val, keyw=keyword, el=keyvec[2], ext=df.at[k, 'extension'], deltalam=df.at[k, 'resnum'],
-                                        interp=interp, NLTE=NLTE)
+                                        interp=interp, NLTE=NLTE, abundance_tag=override_tag)
     if namefile != 'STOP':
         if verbose:
             print("Computing spectrum:", namefile)
