@@ -42,7 +42,7 @@ class LineListManager:
         return new_linespec
 
     @staticmethod
-    def create_linelist_single_element(linelist_path, linespec, keyv):
+    def create_linelist_single_element(linelist_path, linespec, keyv, tmp_tag=None):
         """
         Crea una lista di righe per un singolo elemento.
 
@@ -60,6 +60,9 @@ class LineListManager:
             valdlist = [line for line in linespec if 'vald-' in line]
             atomic_n, atomic_ion, elem = keyv
 
+            if tmp_tag is None:
+                tmp_tag = f"p{os.getpid()}"
+
             new_linespec = []
             for valdfile in valdlist:
                 with open(os.path.join(linelist_path, valdfile), "r") as f:
@@ -71,7 +74,7 @@ class LineListManager:
                         n_start = n
                         n_lines = int(datavald[n][32:43]) + 2
 
-                newfile = f'tmp_{valdfile[:-5]}.{elem}'
+                newfile = f'tmp_{tmp_tag}_{valdfile[:-5]}.{elem}'
                 lines_w = datavald[n_start:n_start + n_lines]
 
                 with open(os.path.join(linelist_path, newfile), "w") as file:
