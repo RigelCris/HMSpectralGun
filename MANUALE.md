@@ -116,6 +116,28 @@ Caratteristiche:
 - crea log dedicati per worker,
 - rinomina output con suffisso `_k<indice>` per evitare collisioni.
 
+## 7.1) Opzionale: comandi da ovunque (alias zsh)
+
+Se vuoi lanciare senza entrare ogni volta nella cartella del progetto, aggiungi in `~/.zshrc`:
+
+```bash
+alias spectralgun='cd /path/to/HMSpectralGun && source .venv/bin/activate && python main.py --input'
+alias parallel_spectralgun='cd /path/to/HMSpectralGun && source .venv/bin/activate && python main_parallel.py --input'
+```
+
+Poi ricarica la shell:
+
+```bash
+source ~/.zshrc
+```
+
+Esempio uso:
+
+```bash
+spectralgun /path/to/input.ts
+parallel_spectralgun /path/to/input.ts
+```
+
 ## 8) Output prodotti
 - Script Turbospectrum: `<nome>.com` in `launchpath`.
 - Spettri sintetici: in `savepath`.
