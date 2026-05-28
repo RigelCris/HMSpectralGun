@@ -12,10 +12,11 @@
 \usepackage{array}
 \usepackage{enumitem}
 \usepackage{listings}
+\usepackage{textcomp}
 \usepackage{fancyhdr}
 \setlength{\headheight}{14pt}
 \usepackage{titlesec}
-\usepackage{tcolorbox}
+\usepackage[most]{tcolorbox}
 \usepackage{amsmath}
 
 \hypersetup{
@@ -25,13 +26,14 @@
   citecolor=blue!55!black,
   pdftitle={HMSpectralGun User Manual},
   pdfauthor={HMSpectralGun Team},
-  pdfsubject={Operational manual for Turbospectrum-based stellar spectral synthesis and line-by-line fitting}
+  pdfsubject={Operational manual for Turbospectrum-based stellar spectral synthesis}
 }
 
 \definecolor{codebg}{RGB}{246,248,250}
 \definecolor{rulegray}{RGB}{90,90,90}
 \definecolor{warnbg}{RGB}{255,248,220}
 \definecolor{notebg}{RGB}{239,247,255}
+\definecolor{goodbg}{RGB}{240,255,244}
 
 \lstdefinestyle{manualcode}{
   basicstyle=\ttfamily\small,
@@ -53,7 +55,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \lhead{HMSpectralGun User Manual}
-\rhead{Turbospectrum workflow}
+\rhead{Turbospectrum synthesis workflow}
 \cfoot{\thepage}
 
 \titleformat{\section}{\Large\bfseries}{\thesection}{0.7em}{}
@@ -66,7 +68,8 @@
   title=Important,
   fonttitle=\bfseries,
   boxrule=0.7pt,
-  arc=2pt
+  arc=2pt,
+  breakable
 }
 
 \newtcolorbox{notebox}{
@@ -75,7 +78,18 @@
   title=Note,
   fonttitle=\bfseries,
   boxrule=0.7pt,
-  arc=2pt
+  arc=2pt,
+  breakable
+}
+
+\newtcolorbox{checklistbox}{
+  colback=goodbg,
+  colframe=green!45!black,
+  title=Checklist,
+  fonttitle=\bfseries,
+  boxrule=0.7pt,
+  arc=2pt,
+  breakable
 }
 
 \newcommand{\code}[1]{\texttt{#1}}
@@ -87,13 +101,13 @@
   \vspace*{2.5cm}
   {\Huge\bfseries HMSpectralGun User Manual\par}
   \vspace{0.4cm}
-  {\Large Turbospectrum-based stellar spectral synthesis and line-by-line abundance fitting\par}
+  {\Large Turbospectrum-based stellar spectral synthesis\par}
   \vspace{1.5cm}
-  {\large Improved LaTeX edition\par}
+  {\large Updated LaTeX edition\par}
   \vfill
   \begin{tabular}{rl}
     Project: & \code{HMSpectralGun} \\
-    Scope: & User-facing execution, input preparation, and validation workflow \\
+    Scope: & Serial and parallel synthetic-spectrum production \\
     Status: & Operational manual \\
     Language: & English \\
   \end{tabular}
@@ -106,105 +120,122 @@
 
 \section{Purpose and Scope}
 
-This manual explains how to run the current \code{HMSpectralGun} workflows. The suite generates stellar synthetic spectra with Turbospectrum starting from atmospheric parameters, line lists, abundance patterns, and optional post-processing steps such as convolution, resampling, and noise injection.
+\code{HMSpectralGun} generates synthetic stellar spectra using Turbospectrum. This manual covers the production workflow for synthetic spectra with the two production entry points currently documented for routine use:
 
-The repository contains three main workflows:
-
-\begin{longtable}{p{0.36\textwidth}p{0.54\textwidth}}
+\begin{longtable}{p{0.34\textwidth}p{0.56\textwidth}}
 \toprule
-\textbf{Workflow} & \textbf{Role} \\
+\textbf{Entry point} & \textbf{Purpose} \\
 \midrule
-\code{main.py} & Classical serial synthesis workflow. It reads \code{input.ts} and synthesizes spectra one after another. \\
-\code{main\_parallel.py} & Parallel synthesis workflow. It follows the same logic as \code{main.py}, but distributes independent jobs across multiple workers. \\
-\code{line\_chi2\_on\_the\_fly.py} & Line-by-line abundance workflow. It builds trial grids in \code{[X/Fe]}, synthesizes spectra on the fly, and estimates the best fit using a chi-square criterion. \\
+\code{main.py} & Serial production. It reads an \code{input.ts} file and synthesizes the requested spectra one after another. \\
+\code{main\_parallel.py} & Parallel production. It follows the same synthesis logic, but distributes independent spectra across multiple worker processes. \\
 \bottomrule
 \end{longtable}
 
 \begin{importantbox}
-Turbospectrum is an external dependency. \code{HMSpectralGun} prepares inputs, launch scripts, and post-processing products, but the physical synthesis is performed by the compiled Turbospectrum executables.
+This manual is limited to synthetic-spectrum production. Line-by-line abundance fitting is not part of the production manual scope. If a line-fit configuration is present in the repository, treat it as a separate analysis workflow and adapt its placeholder paths to the local dataset before use.
 \end{importantbox}
 
-\section{Recommended Quick Start}
+\section{Quick Start}
 
-From the repository root, first validate the Python environment and then run a minimal single-spectrum test before launching a long batch.
+From a fresh clone, create a Python environment, install the required packages, export the runtime paths for Turbospectrum, and run a small validation job.
 
 \begin{lstlisting}[language=bash]
-python --version
-python -c "import numpy, pandas, scipy, matplotlib; print('core stack: ok')"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+\end{lstlisting}
+
+Export the minimum runtime paths:
+
+\begin{lstlisting}[language=bash]
+export HMSPECTRALGUN_EXEC_PATH="/path/to/turbospectrum/exec-gf"
+export HMSPECTRALGUN_LAUNCH_PATH="/path/to/turbospectrum/COM/santerre"
+\end{lstlisting}
+
+Prepare \code{input.ts} and run the serial workflow:
+
+\begin{lstlisting}[language=bash]
 python main.py --input input.ts --progress
 \end{lstlisting}
 
-For line-by-line analysis, start from the example JSON configuration and restrict the first run to one target:
+For a parallel batch:
 
 \begin{lstlisting}[language=bash]
-python line_chi2_on_the_fly.py --config line_fit_config.example.json --star <star_id>
+python main_parallel.py --input input.ts
 \end{lstlisting}
 
 \begin{notebox}
-The first production rule is simple: never start a large batch before a one-spectrum or one-star validation run has produced a physically sensible output file and usable logs.
+The recommended first run is a single-spectrum test. Do not start a large batch until one spectrum has been generated, inspected, and matched to the expected wavelength range, resolution, abundance pattern, and output naming convention.
 \end{notebox}
 
 \section{Requirements}
 
 \subsection{Python environment}
 
-Python 3.10 or newer is recommended. The code uses the following Python packages:
+Python 3.10 or newer is recommended. The production scripts use the following Python packages:
 
 \begin{itemize}
   \item \code{numpy}, \code{pandas}, \code{tqdm}, and \code{mendeleev};
-  \item \code{scipy}, for resampling and optimization utilities;
-  \item \code{matplotlib}, for line-by-line PDF summary reports;
-  \item \code{PyAstronomy}, for instrumental convolution.
+  \item \code{scipy}, for resampling and numerical utilities;
+  \item \code{PyAstronomy}, for instrumental convolution;
+  \item \code{matplotlib}, when plotting or report utilities are available in the local workflow.
 \end{itemize}
 
-A minimal environment check is:
+A minimal import check is:
 
 \begin{lstlisting}[language=bash]
-which python
-python - <<'PY'
-import numpy, pandas, scipy, matplotlib
-print('core scientific stack: ok')
-PY
+python -c "import numpy, pandas, scipy, matplotlib; print('core stack: ok')"
+python -c "import mendeleev, PyAstronomy; print('spectral stack: ok')"
 \end{lstlisting}
 
-If instrumental convolution is required, also check:
+\subsection{Turbospectrum runtime}
 
-\begin{lstlisting}[language=bash]
-python - <<'PY'
-import PyAstronomy
-print('PyAstronomy: ok')
-PY
-\end{lstlisting}
+Turbospectrum must be compiled and reachable through environment variables. The recommended variables are:
 
-\subsection{Turbospectrum installation}
+\begin{longtable}{p{0.38\textwidth}p{0.52\textwidth}}
+\toprule
+\textbf{Variable} & \textbf{Meaning} \\
+\midrule
+\code{HMSPECTRALGUN\_EXEC\_PATH} & Directory containing the Turbospectrum executables, typically including \code{babsma\_lu} and \code{bsyn\_lu}. \\
+\code{HMSPECTRALGUN\_LAUNCH\_PATH} & Directory where generated \code{.com} scripts are written and executed. \\
+\bottomrule
+\end{longtable}
 
-Turbospectrum must be compiled and its executables must be reachable through the paths expected by the code.
+Optional overrides are available for non-standard installations:
+
+\begin{longtable}{p{0.40\textwidth}p{0.50\textwidth}}
+\toprule
+\textbf{Variable} & \textbf{Default or use case} \\
+\midrule
+\code{HMSPECTRALGUN\_DATASET\_MODEL\_PATH} & MARCS model dataset path. Default: \code{./marcs\_generator/dataset}. \\
+\code{HMSPECTRALGUN\_CONTOPAC\_PATH} & Continuum opacity path. Default: \code{\$\{HMSPECTRALGUN\_LAUNCH\_PATH\}/contopac}. \\
+\code{HMSPECTRALGUN\_INTERPOLATOR\_EXE} & MARCS interpolation executable. Default: \code{./marcs\_generator/interpol\_modeles}. \\
+\code{HMSPECTRALGUN\_BABSMA} & Explicit path to \code{babsma\_lu}, if a directory-level executable path is not sufficient. \\
+\code{HMSPECTRALGUN\_BSYN} & Explicit path to \code{bsyn\_lu}, if a directory-level executable path is not sufficient. \\
+\bottomrule
+\end{longtable}
 
 \begin{importantbox}
-Several paths are hardcoded in the current codebase, including paths such as \code{launchpath}, \code{dataset\_model\_path}, and the paths to \code{babsma\_lu} and \code{bsyn\_lu}. If the repository is moved to a different machine or directory, update these paths before running the workflows.
+On Linux, the generated Turbospectrum \code{.com} scripts use \code{csh} with the shebang \code{\#!/bin/csh -f}. Install \code{csh} or \code{tcsh} before running production jobs on systems where it is not already available.
 \end{importantbox}
 
-\section{Input File Structure}
+\section{Main Input File: \code{input.ts}}
 
-\subsection{The \code{input.ts} file}
+The serial and parallel workflows are driven by an \code{input.ts} file. The parser expects six header lines followed by a spectral-production table.
 
-The file \code{input.ts} is used by \code{main.py} and \code{main\_parallel.py}. The parser expects a rigid structure:
+\subsection{Required structure}
 
 \begin{enumerate}
-  \item line 1: \code{savepath};
-  \item line 2: \code{linelistpath};
-  \item line 3: \code{modelpath};
-  \item line 4: \code{ExplicitModel=True|False};
-  \item line 5: \code{interp=True|False|nearest};
-  \item line 6: third keyword, named \code{NLTE} in the code;
-  \item line 7 onward: spectrum table with either 15 or 17 columns.
+  \item \code{savepath}: output directory for generated spectra;
+  \item \code{linelistpath}: directory containing line-list files and line-list index files;
+  \item \code{modelpath}: directory containing atmosphere models or model products;
+  \item \code{ExplicitModel=True|False};
+  \item \code{interp=True|False|nearest};
+  \item third keyword, read by the parser as \code{NLTE};
+  \item spectral-production table with either 15 or 17 columns.
 \end{enumerate}
 
-\begin{notebox}
-According to the available operational notes, the \code{NLTE} keyword is read by the parser but is not applied inside \code{TurboSpecWriter}. Treat it as non-operational unless the active repository version proves otherwise.
-\end{notebox}
-
-Minimal template:
+Minimal example:
 
 \begin{lstlisting}
 /path/output_spectra/
@@ -216,40 +247,41 @@ NLTE=False
 3600,1.0  -1.00  0.20  15000  15500  2.0  st  *  28000  0.02  *  linelistH.ts  abu.ts  *  txt
 \end{lstlisting}
 
-\subsection{Spectrum table columns}
+\subsection{Table columns}
 
-The spectrum table starts after the first six lines of \code{input.ts}. The expected column order is:
-
-\begin{longtable}{p{0.08\textwidth}p{0.22\textwidth}p{0.60\textwidth}}
+\begin{longtable}{p{0.07\textwidth}p{0.24\textwidth}p{0.59\textwidth}}
 \toprule
 \textbf{No.} & \textbf{Column} & \textbf{Meaning} \\
 \midrule
-\endhead
-1 & \code{Model} & Explicit model filename, or \code{Teff,logg}. \\
-2 & \code{[Fe/H]} & Model metallicity. \\
-3 & \code{[a/Fe]} & Alpha enhancement. \\
+1 & \code{Model} & Explicit model filename, or compact atmospheric identifier \code{Teff,logg}. \\
+2 & \code{[Fe/H]} & Metallicity. \\
+3 & \code{[a/Fe]} & Alpha-enhancement parameter. \\
 4 & \code{lam\_i} & Initial wavelength. \\
 5 & \code{lam\_f} & Final wavelength. \\
-6 & \code{xi} & Microturbulent velocity. \\
-7 & \code{chemistry} & Chemistry pattern: \code{st}, \code{ap}, \code{ae}, \code{mc}, or \code{hc}. \\
-8 & \code{sampl} & \code{*} or resampling step in Angstrom. \\
-9 & \code{RES} & Resolving power used for convolution. \\
-10 & \code{resnum} & Numerical wavelength step used in the Turbospectrum synthesis. \\
-11 & \code{monoelem} & \code{*}, atomic species such as \code{FeI}, or molecules such as \code{CO}, \code{OH}, \code{CN}. \\
-12 & \code{linelist\_file} & File listing the line-list files to be used. \\
+6 & \code{xi} & Microturbulence. \\
+7 & \code{chemistry} & Chemistry mode: \code{st}, \code{ap}, \code{ae}, \code{mc}, or \code{hc}. \\
+8 & \code{sampl} & Resampling step, or \code{*} to skip resampling. \\
+9 & \code{RES} & Resolving power for instrumental convolution. \\
+10 & \code{resnum} & Numerical synthesis step used by Turbospectrum. \\
+11 & \code{monoelem} & \code{*}, an atomic species such as \code{FeI}, or a molecule such as \code{CO}, \code{OH}, or \code{CN}. \\
+12 & \code{linelist\_file} & Index file listing the line-list files to use. \\
 13 & \code{abu\_file} & Abundance file. \\
-14 & \code{snr} & \code{*} or numerical signal-to-noise ratio. \\
+14 & \code{snr} & Signal-to-noise value for noise injection, or \code{*}. \\
 15 & \code{extension} & Output extension, for example \code{txt}. \\
-16 & \code{override\_elem} & Optional atomic number of the element to override. \\
-17 & \code{override\_xfe} & Optional \code{[X/Fe]} value to force. \\
+16 & \code{override\_elem} & Optional atomic number for direct abundance override. \\
+17 & \code{override\_xfe} & Optional forced \code{[X/Fe]} value. \\
 \bottomrule
 \end{longtable}
 
-If columns 16 and 17 are provided, the override has maximum priority over the abundance file.
+\begin{importantbox}
+If columns 16 and 17 are present, the explicit abundance override has maximum priority over the abundance value read from \code{abu\_file}.
+\end{importantbox}
 
-\subsection{Abundance file: \code{abu.ts}}
+\section{Auxiliary Input Files}
 
-The abundance file is a two-column, whitespace-separated table:
+\subsection{Abundance file}
+
+The abundance file, for example \code{abu.ts}, is a two-column text file:
 
 \begin{itemize}
   \item column 1: atomic number;
@@ -259,228 +291,150 @@ The abundance file is a two-column, whitespace-separated table:
 Example:
 
 \begin{lstlisting}
-8   0.20
-12  0.20
-26  0.00
-612613  15.0
+8 0.20
+12 0.20
+26 0.00
+612613 15.0
 \end{lstlisting}
 
-The special row \code{612613} is interpreted as the isotopic ratio \code{C12/C13}.
+The special identifier \code{612613} is interpreted as the carbon isotopic ratio \code{C12/C13}.
 
-\subsection{Line-list files}
+\subsection{Line-list index file}
 
-The \code{linelist\_file} entry points to a plain-text file containing one line-list filename per line:
+The value given in \code{linelist\_file} is an index file containing one line-list filename per line:
 
 \begin{lstlisting}
 vald_1.lin
 vald_2.lin
 \end{lstlisting}
 
-In the classical synthesis workflows, these files are resolved relative to \code{linelistpath}. In the chi-square workflow, they are resolved relative to \code{linelist\_library\_path}.
+Files are resolved relative to \code{linelistpath} for the production workflow.
 
-\section{Workflow 1: Classical Serial Synthesis}
+\section{Serial Production Workflow}
 
-\subsection{Command}
-
-Run the serial workflow with:
+The serial workflow is the safest option for validation, debugging, and small jobs.
 
 \begin{lstlisting}[language=bash]
 python main.py --input input.ts
 \end{lstlisting}
 
-To display a progress bar:
+With a progress bar:
 
 \begin{lstlisting}[language=bash]
 python main.py --input input.ts --progress
 \end{lstlisting}
 
-\subsection{Execution logic}
-
-The serial workflow performs the following operations for each spectrum row:
+The workflow performs the following operations:
 
 \begin{enumerate}
-  \item selects or prepares the atmospheric model, using interpolation, nearest-neighbor selection, or an explicit model;
-  \item writes the Turbospectrum \code{.com} launch script;
+  \item reads and validates the production rows from \code{input.ts};
+  \item selects, prepares, or interpolates the atmospheric model according to \code{ExplicitModel} and \code{interp};
+  \item writes the Turbospectrum \code{.com} script into the launch directory;
   \item runs Turbospectrum;
-  \item adds a descriptive header to the output spectrum;
-  \item optionally applies convolution, resampling, and noise injection.
+  \item creates a descriptive header in the output spectrum;
+  \item optionally applies instrumental convolution using \code{RES};
+  \item optionally applies resampling using \code{sampl};
+  \item optionally injects noise using \code{snr}.
 \end{enumerate}
 
-Use this workflow when debugging a new configuration or when the number of spectra is small.
+\section{Parallel Production Workflow}
 
-\section{Workflow 2: Parallel Synthesis}
-
-\subsection{Command}
-
-Run the parallel workflow with:
+The parallel workflow is intended for batch production after the serial validation run has succeeded.
 
 \begin{lstlisting}[language=bash]
 python main_parallel.py --input input.ts
 \end{lstlisting}
 
-\subsection{Execution logic}
-
-The parallel workflow uses \code{ProcessPoolExecutor} with up to \code{cpu\_count() - 1} workers. It is designed for independent spectra that can be synthesized concurrently.
-
-Operational features include:
+Main characteristics:
 
 \begin{itemize}
-  \item worker-level logging;
-  \item collision avoidance by renaming final outputs with a \code{\_k<index>} suffix;
-  \item a main log named \code{synth\_main\_YYYYMMDD\_HHMMSS.log}.
+  \item uses multiple processes, typically up to \code{cpu\_count() - 1};
+  \item writes a main log named \code{synth\_main\_YYYYMMDD\_HHMMSS.log};
+  \item creates dedicated worker logs;
+  \item renames final outputs with a suffix such as \code{\_k<index>} to avoid collisions between workers.
 \end{itemize}
 
-Use this workflow for large batches when the input file has already been validated in serial mode.
+Use the parallel workflow when the input file contains many independent spectra, the machine has enough CPU cores, and the serial workflow has already validated the configuration.
 
-\section{Workflow 3: Line-by-line Chi-square Analysis}
+\section{Optional Shell Commands from Anywhere}
 
-\subsection{Configuration file}
+To launch the production workflows without manually moving into the repository directory, define shell helper functions.
 
-The line-by-line workflow is controlled by a JSON configuration file. A typical starting point is:
+For \code{zsh}, add the following block to \code{\textasciitilde/.zshrc}. For \code{bash}, add the same block to \code{\textasciitilde/.bashrc}.
 
-\begin{lstlisting}
-line_fit_config.example.json
+\begin{lstlisting}[language=bash]
+spectralgun() {
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main.py --input "${1:-input.ts}" --progress
+}
+
+parallel_spectralgun() {
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main_parallel.py --input "${1:-input.ts}"
+}
 \end{lstlisting}
 
-Main configuration blocks include:
+Reload the shell configuration:
 
-\begin{longtable}{p{0.28\textwidth}p{0.62\textwidth}}
+\begin{lstlisting}[language=bash]
+source ~/.zshrc
+# or, if using bash:
+source ~/.bashrc
+\end{lstlisting}
+
+Usage:
+
+\begin{lstlisting}[language=bash]
+spectralgun /path/to/input.ts
+parallel_spectralgun /path/to/input.ts
+\end{lstlisting}
+
+\section{Generated Outputs and Naming}
+
+The production scripts generate Turbospectrum launch files, synthetic spectra, logs, and optional post-processed products.
+
+\begin{longtable}{p{0.34\textwidth}p{0.56\textwidth}}
 \toprule
-\textbf{Block} & \textbf{Role} \\
+\textbf{Product} & \textbf{Location or convention} \\
 \midrule
-\code{paths} & Observed spectra, synthesis directory, and results directory. \\
-\code{keywords} & Global options, including the \code{[X/Fe]} trial grid, fitting windows, interpolation mode, and related settings. \\
-\code{stars} & List of targets to analyze. \\
+Turbospectrum scripts & \code{<name>.com} files written in \code{HMSPECTRALGUN\_LAUNCH\_PATH}. \\
+Synthetic spectra & Written to \code{savepath}. \\
+Convolved spectra & Typically include a resolution tag such as \code{\_RXXk}. \\
+Noise-injected spectra & Typically include a tag such as \code{\_SNR<value>}. \\
+Abundance-overridden spectra & Include an abundance tag such as \code{\_Fep010}. \\
+Parallel main log & \code{synth\_main\_YYYYMMDD\_HHMMSS.log}. \\
+Worker logs & Dedicated log files generated by the parallel workflow. \\
 \bottomrule
 \end{longtable}
 
-\subsection{Command}
-
-Basic execution:
-
-\begin{lstlisting}[language=bash]
-python line_chi2_on_the_fly.py --config line_fit_config.example.json
-\end{lstlisting}
-
-Useful runtime overrides:
-
-\begin{lstlisting}[language=bash]
-python line_chi2_on_the_fly.py --config cfg.json --star 301_4MCMC.H --xfe-min -0.5 --xfe-max 0.7 --xfe-step 0.1
-\end{lstlisting}
-
-\subsection{Typical outputs}
-
-The usual outputs in \code{results\_path} are:
-
-\begin{itemize}
-  \item \code{<star>\_best.csv};
-  \item \code{<star>\_grid.csv};
-  \item \code{<star>\_summary.pdf}, if \code{matplotlib} is available;
-  \item legacy files named \code{results\_<id>}.
-\end{itemize}
-
-\section{Output Naming and Generated Files}
-
-Turbospectrum launch scripts are written as \code{<name>.com} files in \code{launchpath}. Final spectra are saved in \code{savepath} for the classical workflows, or under \code{analysis\_synth\_path/<star>/} for the chi-square workflow.
-
-If \code{override\_elem} and \code{override\_xfe} are active, the generated filename includes an abundance tag such as \code{\_Fep010} or \code{\_Mgm025}.
-
-\begin{notebox}
-If a spectrum already exists and is non-empty, the workflow may skip its regeneration. This is intentional behavior and prevents accidental overwriting during repeated runs.
-\end{notebox}
-
-\section{Recommended Validation Flows}
-
-Run tests in increasing order of cost.
-
-\subsection{Test A: Environment import test}
-
-\begin{lstlisting}[language=bash]
-python -c "import numpy, pandas, scipy, matplotlib; print('ok')"
-\end{lstlisting}
-
-\subsection{Test B: One-spectrum serial synthesis}
-
-Prepare an \code{input.ts} file with a single spectrum row, then run:
-
-\begin{lstlisting}[language=bash]
-python main.py --input input.ts --progress
-\end{lstlisting}
-
-Check that the output spectrum exists, is non-empty, and contains the expected header.
-
-\subsection{Test C: Small parallel run}
-
-After Test B passes, use a small multi-row input file:
-
-\begin{lstlisting}[language=bash]
-python main_parallel.py --input input.ts
-\end{lstlisting}
-
-Check the main log and verify that output filenames do not collide.
-
-\subsection{Test D: One-star line-by-line run}
-
-Run one target with a narrow trial grid:
-
-\begin{lstlisting}[language=bash]
-python line_chi2_on_the_fly.py --config cfg.json --star <star_id> --xfe-min -0.2 --xfe-max 0.2 --xfe-step 0.1
-\end{lstlisting}
-
-Inspect \code{<star>\_best.csv}, \code{<star>\_grid.csv}, and the summary PDF if generated.
-
 \section{Troubleshooting}
 
-\subsection{\code{ModuleNotFoundError}}
+\begin{longtable}{p{0.38\textwidth}p{0.52\textwidth}}
+\toprule
+\textbf{Symptom} & \textbf{Likely cause and action} \\
+\midrule
+\code{ModuleNotFoundError} & A Python dependency is missing or the wrong environment is active. Activate the intended environment and install the missing package. \\
+\code{No safe interpolation pair} & The MARCS grid does not contain a safe interpolation pair for the requested parameters. Check the model dataset coverage. \\
+\code{No complete safe MARCS interpolation cube} & The local model dataset is incomplete for the requested interpolation. Expand or correct the MARCS grid. \\
+\code{Missing/empty spectrum output} & Turbospectrum did not produce a valid spectrum. Inspect the generated \code{.com} file and logs in the launch directory. \\
+\code{Spectrum already exists} & A non-empty output already exists. The run was skipped intentionally to avoid overwriting existing products. \\
+\bottomrule
+\end{longtable}
 
-A Python dependency is missing from the active environment. Confirm the interpreter and install the missing package in that same environment.
+\section{Pre-Batch Checklist}
 
-\begin{lstlisting}[language=bash]
-which python
-python -c "import numpy, pandas, scipy, matplotlib; print('ok')"
-\end{lstlisting}
-
-\subsection{\code{Cannot parse MARCS model filename}}
-
-The atmospheric model filename does not match the expected naming format. Use a valid MARCS filename or switch to a supported explicit model configuration.
-
-\subsection{\code{No safe interpolation pair} or \code{No complete safe MARCS interpolation cube}}
-
-The MARCS model dataset is insufficient for the requested atmospheric parameters. Add the missing models, change the requested parameters, or use nearest-neighbor selection if scientifically acceptable for the test.
-
-\subsection{Missing or empty spectrum output}
-
-Turbospectrum likely failed or did not write the expected output file. Check the generated \code{.com} file and the Turbospectrum log \code{.txt} files in \code{launchpath}.
-
-\subsection{\code{Spectrum already exists} followed by skip}
-
-The output file already exists and is non-empty. This is expected skip behavior. Remove the existing output only if regeneration is intended.
-
-\section{Pre-run Checklist for Long Jobs}
-
-Before launching a long synthesis or line-by-line run, verify the following:
-
+\begin{checklistbox}
+Before launching a long batch, verify the following points:
 \begin{itemize}
-  \item absolute paths have been updated for the current machine;
-  \item \code{contopac} is available or can be created;
-  \item \code{input.ts} or the JSON configuration has been validated;
-  \item line-list files resolve correctly;
-  \item \code{abu.ts} resolves correctly and contains the intended abundances;
-  \item Turbospectrum executables are reachable;
-  \item a one-spectrum or one-star test has completed successfully;
-  \item output directories are writable;
-  \item old non-empty outputs have been removed if regeneration is required.
+  \item the Python environment is active and all required imports succeed;
+  \item \code{HMSPECTRALGUN\_EXEC\_PATH} points to the Turbospectrum executable directory;
+  \item \code{HMSPECTRALGUN\_LAUNCH\_PATH} exists and is writable;
+  \item \code{savepath}, \code{modelpath}, and \code{linelistpath} exist and are readable or writable as needed;
+  \item \code{input.ts} has been tested on one spectrum;
+  \item all line-list index files resolve to existing line lists;
+  \item all \code{abu\_file} entries are present and correctly formatted;
+  \item \code{csh} or \code{tcsh} is installed on Linux systems;
+  \item existing output files have been intentionally kept, moved, or removed before rerunning.
 \end{itemize}
-
-\section{Best Practices}
-
-\begin{itemize}
-  \item Use \code{main.py} first when debugging a new input file; move to \code{main\_parallel.py} only after the serial run works.
-  \item Keep one minimal validation \code{input.ts} under version control for regression tests.
-  \item Keep production outputs in dated directories to avoid mixing incompatible runs.
-  \item Treat hardcoded absolute paths as configuration debt: document every required local edit before a run.
-  \item For line-by-line analysis, start with a coarse \code{[X/Fe]} grid and refine only after confirming that the observed and synthetic spectra are aligned.
-\end{itemize}
+\end{checklistbox}
 
 \appendix
 
@@ -499,26 +453,17 @@ NLTE=False
 \section{Minimal \code{abu.ts} Template}
 
 \begin{lstlisting}
-8   0.20
-12  0.20
-26  0.00
-612613  15.0
+8 0.20
+12 0.20
+26 0.00
+612613 15.0
 \end{lstlisting}
 
-\section{Operational Rule of Thumb}
+\section{Minimal Line-List Index Template}
 
-For development and debugging, prefer the safest sequence:
-
-\begin{lstlisting}[language=bash]
-# 1. Validate imports
-python -c "import numpy, pandas, scipy, matplotlib; print('ok')"
-
-# 2. Run one serial spectrum
-python main.py --input input.ts --progress
-
-# 3. Only then run parallel or line-by-line workflows
-python main_parallel.py --input input.ts
-python line_chi2_on_the_fly.py --config cfg.json --star <star_id>
+\begin{lstlisting}
+vald_1.lin
+vald_2.lin
 \end{lstlisting}
 
 \end{document}
