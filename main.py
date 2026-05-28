@@ -103,7 +103,8 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
 
     # Lettura dei file di abbondanza
     df_abu, _ = params.read_abu_file(df.at[k, 'abu_file'])
-    elem, deltaabu = df_abu['AtomicNumber'].to_numpy(dtype=float), df_abu['AbundanceDifference'].to_numpy(dtype=float)
+    elem = np.array(df_abu['AtomicNumber'], dtype=float, copy=True)
+    deltaabu = np.array(df_abu['AbundanceDifference'], dtype=float, copy=True)
     override_z, override_xfe, override_tag = _read_explicit_xfe_override(df.iloc[k])
     if Crat is None or len(Crat) == 0:
         isotopic_n = 0

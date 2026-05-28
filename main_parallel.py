@@ -69,6 +69,8 @@ def init_worker(input_file, launchpath_arg,
     linelistpath      = linelistpath_arg
     modelpath         = modelpath_arg
     model_map         = model_map_arg
+    worker_contopac = os.path.join(runtime_arg["contopac_path"], f"worker_{os.getpid()}")
+    os.makedirs(worker_contopac, exist_ok=True)
     turbo_spec_writer = TurboSpecWriter(
         savepath,
         linelistpath,
@@ -76,7 +78,7 @@ def init_worker(input_file, launchpath_arg,
         launchpath,
         babsma_exec=runtime_arg["babsma_exec"],
         bsyn_exec=runtime_arg["bsyn_exec"],
-        contopac_path=runtime_arg["contopac_path"],
+        contopac_path=worker_contopac,
     )
 
 def _tag_output_name(filename, tag):
@@ -167,8 +169,8 @@ def worker(k):
                 linelistpath, linespec, keyvec, tmp_tag=tmp_tag)
 
         df_abu, _ = params.read_abu_file(row['abu_file'])
-        elem   = df_abu['AtomicNumber'].to_numpy(dtype=float)
-        delta  = df_abu['AbundanceDifference'].to_numpy(dtype=float)
+        elem   = np.array(df_abu['AtomicNumber'], dtype=float, copy=True)
+        delta  = np.array(df_abu['AbundanceDifference'], dtype=float, copy=True)
         override_z, override_xfe, override_tag = _read_explicit_xfe_override(row)
         if Crat is None or len(Crat) == 0:
             isotopic_n = 0
