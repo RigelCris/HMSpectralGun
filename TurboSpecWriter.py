@@ -7,11 +7,27 @@ from os.path import exists
 import re
 
 class TurboSpecWriter:
-    def __init__(self, save_path, linelist_path, model_path, launch_path ):
+    def __init__(
+        self,
+        save_path,
+        linelist_path,
+        model_path,
+        launch_path,
+        babsma_exec="babsma_lu",
+        bsyn_exec="bsyn_lu",
+        contopac_path=None,
+    ):
         self.model_path = model_path
         self.launch_path = launch_path
         self.save_path = save_path
         self.linelist_path = linelist_path
+        self.babsma_exec = babsma_exec
+        self.bsyn_exec = bsyn_exec
+        if contopac_path is None:
+            self.contopac_path = os.path.join(self.launch_path, "contopac")
+        else:
+            self.contopac_path = contopac_path
+        self.contopac_path = self.contopac_path.rstrip("/")
 
     def explicit_marcs(self, model_name):
         """
@@ -30,14 +46,14 @@ class TurboSpecWriter:
             return '.false.'
         return '.true.'
 
-    def check_and_create_contopacdir(self, path_to_dir):
+    def check_and_create_contopacdir(self, path_to_dir=None):
         """
         Checks if a directory exists and creates it if it does not.
 
         Parameters:
         - path_to_dir: str, path to the directory
         """
-        contopac_dir = os.path.join(path_to_dir, '../contopac')
+        contopac_dir = self.contopac_path if path_to_dir is None else os.path.join(path_to_dir, '../contopac')
         if not os.path.exists(contopac_dir):
             print("CONTOPAC directory does not exist. Creating it.")
             os.makedirs(contopac_dir)
@@ -193,14 +209,14 @@ class TurboSpecWriter:
             file.write("\n")
             file.write("# Abundances from the model are not used\n")
             file.write("\n")
-            file.write("time /Users/cfanelli/astro/softw/TS-NLTE/exec-gf/babsma_lu <<EOF\n")
+            file.write(f"time {self.babsma_exec} <<EOF\n")
             file.write(f"'LAMBDA_MIN:'  '${{lam_min}}'\n")
             file.write(f"'LAMBDA_MAX:'  '${{lam_max}}'\n")
             file.write(f"'LAMBDA_STEP:' '${{deltalam}}'\n")
             file.write(f"'MODELINPUT:' '$mpath/${{MODEL}}'\n")
             marcs_condition = '.false.' if ('interpol' in model_name or 'kur' in model_name) else '.true.'
             file.write(f"'MARCS-FILE:' '{marcs_condition}'\n")
-            file.write("'MODELOPAC:' '/Users/cfanelli/astro/softw/TS-NLTE/COM/contopac/${MODEL}.opac'\n")
+            file.write(f"'MODELOPAC:' '{self.contopac_path}/${{MODEL}}.opac'\n")
             file.write("'ABUND_SOURCE:' 'magg'\n")
             file.write(f"'METALLICITY:'    '${{METALLIC}}'\n")
             file.write(f"'ALPHA/Fe   :'    '{alpha}'\n")
@@ -219,7 +235,7 @@ class TurboSpecWriter:
             file.write("\n")
             file.write("########################################################################\n")
             file.write("\n")
-            file.write("time /Users/cfanelli/astro/softw/TS-NLTE/exec-gf/bsyn_lu <<EOF\n")
+            file.write(f"time {self.bsyn_exec} <<EOF\n")
             file.write("'NLTE :'          '.false.'\n")
             file.write("'NLTEINFOFILE:'  '../DATA/SPECIES_LTE_NLTE.dat'\n")
             file.write("#'SEGMENTSFILE:'     '${dpath}/segfile.txt'\n")
@@ -229,7 +245,7 @@ class TurboSpecWriter:
             file.write(f"'LAMBDA_STEP:' '${{deltalam}}'\n")
             file.write("'INTENSITY/FLUX:' 'Flux'\n")
             file.write("'ABFIND        :' '.false.'\n")
-            file.write(f"'MODELOPAC:' '/Users/cfanelli/astro/softw/TS-NLTE/COM/contopac/${{MODEL}}.opac'\n")
+            file.write(f"'MODELOPAC:' '{self.contopac_path}/${{MODEL}}.opac'\n")
             file.write(f"'RESULTFILE :' '$spath/${{result}}.${{ext}}'\n")
             file.write(f"'METALLICITY:'    '${{METALLIC}}'\n")
             file.write(f"'ALPHA/Fe   :'    '{alpha}'\n")

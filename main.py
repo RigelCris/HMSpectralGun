@@ -4,6 +4,7 @@
 import argparse
 import os
 import time
+import shutil
 import numpy as np
 from tqdm import tqdm
 from mendeleev import element as chemical_element
@@ -19,6 +20,7 @@ try:
     from HMSpectralGun.SpectrumConvolver import SpectrumConvolver
     from HMSpectralGun.SNR               import SpectrumNoiseAdder
     from HMSpectralGun.Resampling        import SpectrumResampler
+    from HMSpectralGun.runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
 except ModuleNotFoundError:
     # Fallback per esecuzione diretta dalla cartella HMSpectralGun.
     from Intro             import Intro
@@ -30,6 +32,7 @@ except ModuleNotFoundError:
     from SpectrumConvolver import SpectrumConvolver
     from SNR               import SpectrumNoiseAdder
     from Resampling        import SpectrumResampler
+    from runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
 
 
 
@@ -60,7 +63,7 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
     
     # Inizializzazione delle classi con i rispettivi parametri
     linelist_manager       =   LineListManager()  # Assumendo che non richieda parametri
-    model_maker            =   ModelMaker(dataset_model_path)
+    model_maker            =   ModelMaker(dataset_model_path, interpolator_exe=interpolator_exe)
     header                 =   HeaderCreator(launchpath, savepath)
     spectrum_convolver     =   SpectrumConvolver(savepath)  # Assumendo che non richieda parametri
 
@@ -73,14 +76,19 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
         param = df.at[k, 'Model'].split(",")
         Teff, logg = int(param[0]), float(param[1])
         models = model_maker.select_models_for_interpolation(Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'])
-        model = model_maker.write_interpolator(Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'chemistry'], modelpath, models)
+        model = model_maker.write_interpolator(
+            Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'], modelpath, models
+        )
     elif (explicit_model == 'False') & (interp.lower() == "nearest"):
         param = df.at[k, 'Model'].split(",")
         Teff, logg = int(param[0]), float(param[1])
         model = model_maker.select_nearest_model(Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'], modelpath)
     elif (explicit_model == 'True') & (interp == 'False'):
         model = df.at[k, 'Model'].split(",")[0]
-        os.system('cp '+dataset_model_path+model+' '+modelpath)
+        source_model = os.path.join(dataset_model_path, model)
+        target_model = os.path.join(modelpath, model)
+        if not os.path.exists(target_model):
+            shutil.copy2(source_model, target_model)
 
     dict_linelist = params.process_solar_references(df.at[k, 'linelist_file'], df.at[k, 'abu_file'], df.at[k, '[Fe/H]'])
     linespec = dict_linelist['linelist_content']
@@ -178,11 +186,22 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
 args = parse_arguments()
 current_path = os.getcwd()
 input_file = os.path.join(current_path, args.input)
-dataset_model_path = '/Users/cfanelli/astro/softw/TS-NLTE/COM/santerre/HMSpectralGun/marcs_generator/dataset/'
-launchpath = '/Users/cfanelli/astro/softw/TS-NLTE/COM/'
+runtime = resolve_runtime_paths(project_root=os.path.dirname(os.path.abspath(__file__)))
+validate_turbospectrum_paths(runtime)
+dataset_model_path = runtime["dataset_model_path"]
+launchpath = runtime["launch_path"]
+interpolator_exe = runtime["interpolator_exe"]
 params = InputParameters(input_file)
 savepath, linelistpath, modelpath = params.get_paths()
-turbo_spec_writer = TurboSpecWriter(savepath, linelistpath, modelpath, launchpath)
+turbo_spec_writer = TurboSpecWriter(
+    savepath,
+    linelistpath,
+    modelpath,
+    launchpath,
+    babsma_exec=runtime["babsma_exec"],
+    bsyn_exec=runtime["bsyn_exec"],
+    contopac_path=runtime["contopac_path"],
+)
 
 # Introduzione e stampa dei percorsi
 Intro.intro1()
@@ -191,6 +210,11 @@ print(f"Save Path: {savepath}")
 print(f"Linelist Path: {linelistpath}")
 print(f"Model Path: {modelpath}")
 print(f"Launch Path: {launchpath}")
+print(f"Dataset Path: {dataset_model_path}")
+print(f"Interpolator: {interpolator_exe}")
+print(f"babsma_lu: {runtime['babsma_exec']}")
+print(f"bsyn_lu: {runtime['bsyn_exec']}")
+print(f"Contopac: {runtime['contopac_path']}")
 print(f"Current Path: {current_path}")
 
 if __name__ == '__main__':
@@ -199,7 +223,7 @@ if __name__ == '__main__':
     print("****************************************************************\n")
 
     problem_list = []
-    turbo_spec_writer.check_and_create_contopacdir(modelpath)
+    turbo_spec_writer.check_and_create_contopacdir()
 
     # Elaborazione degli spettri
     if number_of_spec == 1:

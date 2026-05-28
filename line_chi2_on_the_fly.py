@@ -90,11 +90,13 @@ try:
     from HMSpectralGun.TurboSpecWriter import TurboSpecWriter
     from HMSpectralGun.HeaderCreator import HeaderCreator
     from HMSpectralGun.SpectrumConvolver import SpectrumConvolver
+    from HMSpectralGun.runtime_paths import resolve_runtime_paths, validate_turbospectrum_paths
 except ModuleNotFoundError:
     from ModelMaker import ModelMaker, SkipModelError
     from TurboSpecWriter import TurboSpecWriter
     from HeaderCreator import HeaderCreator
     from SpectrumConvolver import SpectrumConvolver
+    from runtime_paths import resolve_runtime_paths, validate_turbospectrum_paths
 
 
 ALPHA_ELEMENTS = [8, 12, 14, 16, 20, 22]
@@ -119,9 +121,7 @@ SOLAR_REFERENCES = np.array([
 
 
 def parse_args():
-    script_dir = Path(__file__).resolve().parent
-    default_dataset = script_dir / "marcs_generator" / "dataset"
-    default_launch = script_dir.parents[2]
+    runtime_defaults = resolve_runtime_paths(project_root=Path(__file__).resolve().parent)
 
     parser = argparse.ArgumentParser(
         description="Line-by-line chi2 abundance analysis with on-the-fly HMSpectralGun synthesis."
@@ -136,8 +136,12 @@ def parse_args():
     parser.add_argument("--keep-synthetic", action="store_true", help="Override keywords.keep_synthetic=True")
     parser.add_argument("--cleanup-com-files", action="store_true", help="Override keywords.cleanup_com_files=True")
     parser.set_defaults(
-        _default_dataset_model_path=str(default_dataset),
-        _default_launch_path=str(default_launch) + os.sep,
+        _default_dataset_model_path=runtime_defaults["dataset_model_path"],
+        _default_launch_path=runtime_defaults["launch_path"],
+        _default_babsma_exec=runtime_defaults["babsma_exec"],
+        _default_bsyn_exec=runtime_defaults["bsyn_exec"],
+        _default_contopac_path=runtime_defaults["contopac_path"],
+        _default_interpolator_exe=runtime_defaults["interpolator_exe"],
     )
     return parser.parse_args()
 
@@ -166,6 +170,17 @@ def resolve_path(maybe_path, base_dirs):
         if candidate.exists():
             return str(candidate.resolve())
     return str(path.resolve()) if path.is_absolute() else str((Path(base_dirs[0]) / path).resolve())
+
+
+def resolve_executable(maybe_path, base_dirs):
+    if maybe_path is None:
+        return None
+    text = str(maybe_path).strip()
+    if not text:
+        return None
+    if "/" not in text:
+        return text
+    return resolve_path(text, base_dirs)
 
 
 def parse_optional_float(value):
@@ -227,6 +242,18 @@ def load_config(args):
         ),
         "aux_file_path": resolve_path(
             keywords.get("aux_file_path", paths["obs_spectra_path"]), cfg_base_dirs
+        ),
+        "babsma_exec": resolve_executable(
+            keywords.get("babsma_exec", args._default_babsma_exec), cfg_base_dirs
+        ),
+        "bsyn_exec": resolve_executable(
+            keywords.get("bsyn_exec", args._default_bsyn_exec), cfg_base_dirs
+        ),
+        "contopac_path": resolve_path(
+            keywords.get("contopac_path", args._default_contopac_path), cfg_base_dirs
+        ),
+        "interpolator_exe": resolve_path(
+            keywords.get("interpolator_exe", args._default_interpolator_exe), cfg_base_dirs
         ),
         "auto": normalize_bool(
             args.auto == "yes" if args.auto else keywords.get("auto", False), default=False
@@ -1747,12 +1774,20 @@ def run_star(runtime, star_row):
     checkpoint_path = Path(runtime["results_path"]) / f"{star_ctx['star_slug']}_checkpoint.json"
     synth_cache_index_path = synth_dir / "synth_cache_index.json"
 
-    turbo_writer = TurboSpecWriter(str(synth_dir) + os.sep, runtime["linelist_library_path"], str(model_dir) + os.sep, runtime["launch_path"])
+    turbo_writer = TurboSpecWriter(
+        str(synth_dir) + os.sep,
+        runtime["linelist_library_path"],
+        str(model_dir) + os.sep,
+        runtime["launch_path"],
+        babsma_exec=runtime["babsma_exec"],
+        bsyn_exec=runtime["bsyn_exec"],
+        contopac_path=runtime["contopac_path"],
+    )
     header_creator = HeaderCreator(runtime["launch_path"], str(synth_dir) + os.sep)
     convolver = SpectrumConvolver(str(synth_dir) + os.sep)
-    model_maker = ModelMaker(runtime["dataset_model_path"])
+    model_maker = ModelMaker(runtime["dataset_model_path"], interpolator_exe=runtime["interpolator_exe"])
 
-    turbo_writer.check_and_create_contopacdir(str(model_dir) + os.sep)
+    turbo_writer.check_and_create_contopacdir()
 
     try:
         model_name = prepare_model(star_ctx, runtime, model_maker, str(model_dir) + os.sep)
@@ -2205,6 +2240,7 @@ def run_star(runtime, star_row):
 if __name__ == "__main__":
     args = parse_args()
     runtime = load_config(args)
+    validate_turbospectrum_paths(runtime)
 
     os.makedirs(runtime["analysis_synth_path"], exist_ok=True)
     os.makedirs(runtime["results_path"], exist_ok=True)

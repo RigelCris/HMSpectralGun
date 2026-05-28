@@ -7,10 +7,17 @@ Questo manuale copre solo la produzione di spettri sintetici con:
 
 ## 2) Requisiti
 - Python 3.10+.
-- Librerie: `numpy`, `pandas`, `tqdm`, `mendeleev`, `scipy`, `PyAstronomy`.
-- Turbospectrum compilato e accessibile dai path impostati nel codice.
+- Librerie: `numpy`, `pandas`, `tqdm`, `mendeleev`, `scipy`, `PyAstronomy`, `matplotlib`.
+- Turbospectrum compilato e accessibile via variabili ambiente.
 
-Nota: nel progetto sono presenti path assoluti hardcoded (`launchpath`, `dataset_model_path`, path di `babsma_lu`/`bsyn_lu`). Se cambi macchina o struttura cartelle, aggiornarli.
+Variabili consigliate:
+- `HMSPECTRALGUN_EXEC_PATH` (cartella con `babsma_lu` e `bsyn_lu`)
+- `HMSPECTRALGUN_LAUNCH_PATH` (cartella dove scrivere/eseguire i `.com`)
+
+Opzionali:
+- `HMSPECTRALGUN_DATASET_MODEL_PATH`
+- `HMSPECTRALGUN_CONTOPAC_PATH`
+- `HMSPECTRALGUN_INTERPOLATOR_EXE`
 
 ## 3) File di input principale: `input.ts`
 Struttura attesa:

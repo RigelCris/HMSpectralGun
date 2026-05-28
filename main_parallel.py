@@ -25,6 +25,7 @@ try:
     from HMSpectralGun.SpectrumConvolver import SpectrumConvolver
     from HMSpectralGun.SNR               import SpectrumNoiseAdder
     from HMSpectralGun.Resampling        import SpectrumResampler
+    from HMSpectralGun.runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
 except ModuleNotFoundError:
     # Fallback per esecuzione diretta dalla cartella HMSpectralGun.
     from Intro             import Intro
@@ -36,6 +37,8 @@ except ModuleNotFoundError:
     from SpectrumConvolver import SpectrumConvolver
     from SNR               import SpectrumNoiseAdder
     from Resampling        import SpectrumResampler
+    from runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
+
 def parse_arguments():
     p = argparse.ArgumentParser(description='Sintesi spettri in parallelo')
     p.add_argument('--input', type=str, default='input.ts',
@@ -55,7 +58,7 @@ def setup_main_logger(log_path):
 
 def init_worker(input_file, launchpath_arg,
                 savepath_arg, linelistpath_arg, modelpath_arg,
-                model_map_arg):
+                model_map_arg, runtime_arg):
     """
     Inizializza ogni processo: setta i global per i parametri e TurboSpecWriter.
     """
@@ -66,7 +69,15 @@ def init_worker(input_file, launchpath_arg,
     linelistpath      = linelistpath_arg
     modelpath         = modelpath_arg
     model_map         = model_map_arg
-    turbo_spec_writer = TurboSpecWriter(savepath, linelistpath, modelpath, launchpath)
+    turbo_spec_writer = TurboSpecWriter(
+        savepath,
+        linelistpath,
+        modelpath,
+        launchpath,
+        babsma_exec=runtime_arg["babsma_exec"],
+        bsyn_exec=runtime_arg["bsyn_exec"],
+        contopac_path=runtime_arg["contopac_path"],
+    )
 
 def _tag_output_name(filename, tag):
     path = Path(filename)
@@ -294,8 +305,10 @@ if __name__ == '__main__':
     input_file = os.path.join(cwd, args.input)
 
     # Percorsi di default
-    dataset_dp = '/Users/cfanelli/astro/softw/TS-NLTE/COM/santerre/HMSpectralGun/marcs_generator/dataset/'
-    launch_dp  = '/Users/cfanelli/astro/softw/TS-NLTE/COM/'
+    runtime = resolve_runtime_paths(project_root=os.path.dirname(os.path.abspath(__file__)))
+    validate_turbospectrum_paths(runtime)
+    dataset_dp = runtime["dataset_model_path"]
+    launch_dp  = runtime["launch_path"]
 
     # Logger principale
     stamp    = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -311,11 +324,23 @@ if __name__ == '__main__':
     logger.info(f"Linelist Path: {linelist_dp}")
     logger.info(f"Model Path:    {model_dp}")
     logger.info(f"Launch Path:   {launch_dp}")
+    logger.info(f"Dataset Path:  {dataset_dp}")
+    logger.info(f"Interpolator:  {runtime['interpolator_exe']}")
+    logger.info(f"babsma_lu:     {runtime['babsma_exec']}")
+    logger.info(f"bsyn_lu:       {runtime['bsyn_exec']}")
+    logger.info(f"Contopac:      {runtime['contopac_path']}")
     logger.info(f"Current Path:  {cwd}")
 
     # Prepara la directory contopac
-    TurboSpecWriter(save_dp, linelist_dp, model_dp, launch_dp)\
-        .check_and_create_contopacdir(model_dp)
+    TurboSpecWriter(
+        save_dp,
+        linelist_dp,
+        model_dp,
+        launch_dp,
+        babsma_exec=runtime["babsma_exec"],
+        bsyn_exec=runtime["bsyn_exec"],
+        contopac_path=runtime["contopac_path"],
+    ).check_and_create_contopacdir()
 
     # Numero spettri e DataFrame
     n_spec = params0.write_output_spectra_count()
@@ -323,7 +348,7 @@ if __name__ == '__main__':
     kws    = params0.get_keywords()
 
     # Mappatura modelli
-    mm        = ModelMaker(dataset_dp)
+    mm        = ModelMaker(dataset_dp, interpolator_exe=runtime["interpolator_exe"])
     model_map = {}
     missing_explicit_models = []
     for k in range(n_spec):
@@ -385,7 +410,7 @@ if __name__ == '__main__':
             initializer=init_worker,
             initargs=(input_file, launch_dp,
                       save_dp, linelist_dp, model_dp,
-                      model_map)
+                      model_map, runtime)
         ) as executor:
             futures = {executor.submit(worker, k): k for k in range(n_spec)}
             for _ in tqdm(
@@ -399,7 +424,7 @@ if __name__ == '__main__':
     else:
         init_worker(input_file, launch_dp,
                     save_dp, linelist_dp, model_dp,
-                    model_map)
+                    model_map, runtime)
         results = [worker(0)]
 
 

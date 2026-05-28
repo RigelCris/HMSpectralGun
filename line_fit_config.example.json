@@ -1,8 +1,8 @@
 {
   "paths": {
-    "obs_spectra_path": "/Users/cfanelli/astro/P110/UKS1/dataset/obs/4MCMC/",
-    "analysis_synth_path": "/Users/cfanelli/astro/P110/UKS1/analysis/synthetic_line_fit/",
-    "results_path": "/Users/cfanelli/astro/P110/UKS1/analysis/results/line_fit/"
+    "obs_spectra_path": "./obs/",
+    "analysis_synth_path": "./output/synthetic_line_fit/",
+    "results_path": "./output/results/line_fit/"
   },
   "keywords": {
     "auto": false,
@@ -20,10 +20,10 @@
     "resnum": 0.05,
     "extension": "txt",
     "monoelem": "*",
-    "dataset_model_path": "/Users/cfanelli/astro/softw/TS-NLTE/COM/santerre/HMSpectralGun/marcs_generator/dataset",
-    "launch_path": "/Users/cfanelli/astro/softw/TS-NLTE/COM/",
-    "linelist_library_path": "/Users/cfanelli/astro/pyramid/linelists/",
-    "aux_file_path": "/Users/cfanelli/astro/softw/TS-NLTE/COM/santerre/",
+    "dataset_model_path": "./marcs_generator/dataset",
+    "launch_path": "./",
+    "linelist_library_path": "./",
+    "aux_file_path": "./",
     "keep_synthetic": true,
     "cleanup_com_files": true,
     "optimize_shift": true,

@@ -68,9 +68,11 @@ class ModelMaker:
     def __init__(
         self,
         dataset_model_path: str,
-        interpolator_exe: str = "/Users/cfanelli/astro/softw/TS-NLTE/COM/santerre/HMSpectralGun/marcs_generator/interpol_modeles",
+        interpolator_exe: str | None = None,
     ):
         self.dataset_model_path = Path(dataset_model_path).expanduser()
+        if interpolator_exe is None:
+            interpolator_exe = str(Path(__file__).resolve().parent / "marcs_generator" / "interpol_modeles")
         self.interpolator_exe = str(Path(interpolator_exe).expanduser())
 
     @staticmethod
