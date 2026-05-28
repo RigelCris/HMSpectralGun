@@ -39,11 +39,16 @@ Parallel run:
 python main_parallel.py --input input.ts
 ```
 
-Optional: global commands from anywhere (`zsh`):
+Optional: global commands from anywhere (`zsh`), without changing your working directory:
 
 ```bash
-alias spectralgun='cd /path/to/HMSpectralGun && source .venv/bin/activate && python main.py --input'
-alias parallel_spectralgun='cd /path/to/HMSpectralGun && source .venv/bin/activate && python main_parallel.py --input'
+spectralgun() {
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main.py --input "${1:-input.ts}"
+}
+
+parallel_spectralgun() {
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main_parallel.py --input "${1:-input.ts}"
+}
 ```
 
 Add them to `~/.zshrc`, then run `source ~/.zshrc`.

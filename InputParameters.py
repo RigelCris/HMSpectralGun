@@ -4,6 +4,7 @@
 import numpy as np
 import sys
 import os
+from pathlib import Path
 from mendeleev import element
 from collections import Counter
 from os.path import exists
@@ -60,7 +61,8 @@ class InputParameters:
         Args:
             filename (str): Il nome del file di input.
         """
-        self.filename = filename
+        self.filename = str(Path(filename).expanduser().resolve())
+        self.base_dir = str(Path(self.filename).parent)
         self.savepath = None
         self.linelistpath = None
         self.modelpath = None
@@ -71,6 +73,24 @@ class InputParameters:
         self.linelist_file_content = None
         self.abu_file_content = None
         self.read_file()
+
+    def _resolve_aux_path(self, aux_file):
+        """
+        Resolve auxiliary file paths in a robust way:
+        1) absolute paths are used as-is
+        2) relative paths are resolved against input.ts directory
+        3) fallback to current working directory for backward compatibility
+        """
+        aux_path = Path(str(aux_file)).expanduser()
+        if aux_path.is_absolute():
+            return str(aux_path)
+
+        candidate_from_input = Path(self.base_dir) / aux_path
+        if candidate_from_input.exists():
+            return str(candidate_from_input.resolve())
+
+        candidate_from_cwd = Path(os.getcwd()) / aux_path
+        return str(candidate_from_cwd.resolve())
 
     def decisor_model(self, interp):
         """
@@ -180,7 +200,7 @@ class InputParameters:
         Returns:
             list: Contenuto del file della lista di righe.
         """
-        linelist_file_path = os.path.join(os.getcwd(), linelist_file)
+        linelist_file_path = self._resolve_aux_path(linelist_file)
         with open(linelist_file_path, 'r') as file:
             return file.readlines()
 
@@ -194,7 +214,7 @@ class InputParameters:
         Returns:
             tuple: DataFrame delle abbondanze senza Crat, e Crat se esiste.
         """
-        abu_file_path = os.path.join(os.getcwd(), abu_file)
+        abu_file_path = self._resolve_aux_path(abu_file)
         abu_data = pd.read_csv(abu_file_path, sep=r'\s+', header=None, names=["AtomicNumber", "AbundanceDifference"])
         # Estrai Crat se esiste
         Crat = abu_data[abu_data["AtomicNumber"] == 612613]["AbundanceDifference"]

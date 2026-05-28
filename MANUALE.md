@@ -116,13 +116,18 @@ Caratteristiche:
 - crea log dedicati per worker,
 - rinomina output con suffisso `_k<indice>` per evitare collisioni.
 
-## 7.1) Opzionale: comandi da ovunque (alias zsh)
+## 7.1) Opzionale: comandi da ovunque (funzioni zsh)
 
 Se vuoi lanciare senza entrare ogni volta nella cartella del progetto, aggiungi in `~/.zshrc`:
 
 ```bash
-alias spectralgun='cd /path/to/HMSpectralGun && source .venv/bin/activate && python main.py --input'
-alias parallel_spectralgun='cd /path/to/HMSpectralGun && source .venv/bin/activate && python main_parallel.py --input'
+spectralgun() {
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main.py --input "${1:-input.ts}"
+}
+
+parallel_spectralgun() {
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main_parallel.py --input "${1:-input.ts}"
+}
 ```
 
 Poi ricarica la shell:
