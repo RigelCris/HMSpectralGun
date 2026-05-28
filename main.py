@@ -5,6 +5,7 @@ import argparse
 import os
 import time
 import shutil
+import subprocess
 import numpy as np
 from tqdm import tqdm
 from mendeleev import element as chemical_element
@@ -136,7 +137,20 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
     if namefile != 'STOP':
         if verbose:
             print("Computing spectrum:", namefile)
-        os.system(launchpath + namefile+'.com > ' + launchpath + 'log')
+        com_path = os.path.join(launchpath, namefile + '.com')
+        log_filename = f"log_{os.path.splitext(namefile)[0]}.txt"
+        log_path = os.path.join(launchpath, log_filename)
+        with open(log_path, "w") as log_handle:
+            proc = subprocess.run([com_path], stdout=log_handle, stderr=subprocess.STDOUT, check=False)
+
+        raw_output_path = os.path.join(savepath, namefile)
+        if proc.returncode != 0 or (not os.path.exists(raw_output_path)) or os.path.getsize(raw_output_path) == 0:
+            print(f"ERROR: Turbospectrum failed for {namefile}. Check log: {log_path}")
+            problem_list.append(namefile)
+            if pbar:
+                pbar.update(1)
+            return
+
         header.create_combined_header(namefile, model=model, met=df.at[k, '[Fe/H]'], alpha=df.at[k, '[a/Fe]'], elem=elem,
                                       deltaabu=deltaabu, lam_min=df.at[k, 'lam_i'], lam_max=df.at[k, 'lam_f'],
                                       xi=df.at[k, 'xi'], isotopic_n=isotopic_n, isotopic_val=isotopic_val,

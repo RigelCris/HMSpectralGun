@@ -8,6 +8,7 @@ Runtime path helpers for portable HMSpectralGun execution.
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
 
@@ -90,9 +91,14 @@ def validate_turbospectrum_paths(runtime: dict) -> None:
     """
     missing = []
     for exe_key in ("babsma_exec", "bsyn_exec"):
-        exe = Path(runtime[exe_key]).expanduser()
-        if exe.is_absolute() and not exe.exists():
-            missing.append(f"{exe_key}={exe}")
+        exe_value = str(runtime[exe_key]).strip()
+        exe = Path(exe_value).expanduser()
+        if exe.is_absolute():
+            if not exe.exists():
+                missing.append(f"{exe_key}={exe}")
+        else:
+            if shutil.which(exe_value) is None:
+                missing.append(f"{exe_key}={exe_value} (not found in PATH)")
     if missing:
         details = "; ".join(missing)
         raise FileNotFoundError(
