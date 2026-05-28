@@ -20,6 +20,8 @@ export HMSPECTRALGUN_EXEC_PATH="/path/to/turbospectrum/exec-gf"
 export HMSPECTRALGUN_LAUNCH_PATH="/path/to/turbospectrum/COM/santerre"
 ```
 
+Linux note: generated `.com` scripts use `csh` (`#!/bin/csh -f`), so install `csh`/`tcsh` if missing.
+
 Optional overrides:
 
 - `HMSPECTRALGUN_DATASET_MODEL_PATH` (default: `./marcs_generator/dataset`)
@@ -39,11 +41,13 @@ Parallel run:
 python main_parallel.py --input input.ts
 ```
 
-Optional: global commands from anywhere (`zsh`), without changing your working directory:
+Optional: global commands from anywhere, without changing your working directory.
+
+For `zsh` (`~/.zshrc`):
 
 ```bash
 spectralgun() {
-  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main.py --input "${1:-input.ts}"
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main.py --input "${1:-input.ts}" --progress
 }
 
 parallel_spectralgun() {
@@ -51,7 +55,12 @@ parallel_spectralgun() {
 }
 ```
 
-Add them to `~/.zshrc`, then run `source ~/.zshrc`.
+For `bash` (`~/.bashrc`), use the same function block.
+
+Reload your shell config:
+
+- `zsh`: `source ~/.zshrc`
+- `bash`: `source ~/.bashrc`
 
 Usage:
 

@@ -19,6 +19,9 @@ Opzionali:
 - `HMSPECTRALGUN_CONTOPAC_PATH`
 - `HMSPECTRALGUN_INTERPOLATOR_EXE`
 
+Nota Linux:
+- gli script `.com` generati usano `csh` (`#!/bin/csh -f`), quindi su Linux serve avere `csh`/`tcsh` installato.
+
 ## 3) File di input principale: `input.ts`
 Struttura attesa:
 1. `savepath`
@@ -116,13 +119,15 @@ Caratteristiche:
 - crea log dedicati per worker,
 - rinomina output con suffisso `_k<indice>` per evitare collisioni.
 
-## 7.1) Opzionale: comandi da ovunque (funzioni zsh)
+## 7.1) Opzionale: comandi da ovunque (funzioni zsh/bash)
 
-Se vuoi lanciare senza entrare ogni volta nella cartella del progetto, aggiungi in `~/.zshrc`:
+Se vuoi lanciare senza entrare ogni volta nella cartella del progetto, aggiungi:
+- su `zsh` in `~/.zshrc`
+- su `bash` in `~/.bashrc`
 
 ```bash
 spectralgun() {
-  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main.py --input "${1:-input.ts}"
+  /path/to/HMSpectralGun/.venv/bin/python /path/to/HMSpectralGun/main.py --input "${1:-input.ts}" --progress
 }
 
 parallel_spectralgun() {
@@ -134,6 +139,8 @@ Poi ricarica la shell:
 
 ```bash
 source ~/.zshrc
+# oppure, se usi bash:
+source ~/.bashrc
 ```
 
 Esempio uso:
