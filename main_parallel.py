@@ -26,6 +26,7 @@ try:
     from HMSpectralGun.SNR               import SpectrumNoiseAdder
     from HMSpectralGun.Resampling        import SpectrumResampler
     from HMSpectralGun.runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
+    from HMSpectralGun.launcher_templates import create_launcher_templates
 except ModuleNotFoundError:
     # Fallback per esecuzione diretta dalla cartella HMSpectralGun.
     from Intro             import Intro
@@ -38,6 +39,7 @@ except ModuleNotFoundError:
     from SNR               import SpectrumNoiseAdder
     from Resampling        import SpectrumResampler
     from runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
+    from launcher_templates import create_launcher_templates
 
 def parse_arguments():
     p = argparse.ArgumentParser(description='Sintesi spettri in parallelo')
@@ -306,6 +308,19 @@ if __name__ == '__main__':
     args       = parse_arguments()
     cwd        = os.getcwd()
     input_file = os.path.join(cwd, args.input)
+    if not os.path.exists(input_file):
+        created_files, created_dirs = create_launcher_templates(input_file)
+        print(f"Input file not found: {input_file}")
+        if created_files:
+            print("Created starter files:")
+            for path in created_files:
+                print(f"  - {path}")
+        if created_dirs:
+            print("Created starter directories:")
+            for path in created_dirs:
+                print(f"  - {path}")
+        print("Fill the templates and run the launcher again.")
+        sys.exit(0)
 
     # Percorsi di default
     runtime = resolve_runtime_paths(project_root=os.path.dirname(os.path.abspath(__file__)))

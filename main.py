@@ -22,6 +22,7 @@ try:
     from HMSpectralGun.SNR               import SpectrumNoiseAdder
     from HMSpectralGun.Resampling        import SpectrumResampler
     from HMSpectralGun.runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
+    from HMSpectralGun.launcher_templates import create_launcher_templates
 except ModuleNotFoundError:
     # Fallback per esecuzione diretta dalla cartella HMSpectralGun.
     from Intro             import Intro
@@ -34,6 +35,7 @@ except ModuleNotFoundError:
     from SNR               import SpectrumNoiseAdder
     from Resampling        import SpectrumResampler
     from runtime_paths     import resolve_runtime_paths, validate_turbospectrum_paths
+    from launcher_templates import create_launcher_templates
 
 
 
@@ -69,6 +71,19 @@ def initialize_runtime(cli_args):
     args = cli_args
     current_path = os.getcwd()
     input_file = os.path.join(current_path, args.input)
+    if not os.path.exists(input_file):
+        created_files, created_dirs = create_launcher_templates(input_file)
+        print(f"Input file not found: {input_file}")
+        if created_files:
+            print("Created starter files:")
+            for path in created_files:
+                print(f"  - {path}")
+        if created_dirs:
+            print("Created starter directories:")
+            for path in created_dirs:
+                print(f"  - {path}")
+        print("Fill the templates and run the launcher again.")
+        return False
     runtime = resolve_runtime_paths(project_root=os.path.dirname(os.path.abspath(__file__)))
     validate_turbospectrum_paths(runtime)
     dataset_model_path = runtime["dataset_model_path"]
@@ -86,6 +101,7 @@ def initialize_runtime(cli_args):
         contopac_path=runtime["contopac_path"],
     )
     problem_list = []
+    return True
 
 
 def print_runtime_summary():
@@ -128,140 +144,154 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
     model_maker            =   ModelMaker(dataset_model_path, interpolator_exe=interpolator_exe)
     header                 =   HeaderCreator(launchpath, savepath)
     spectrum_convolver     =   SpectrumConvolver(savepath)  # Assumendo che non richieda parametri
+    keyword                =   'No'
+    keyvec                 =   ['*', '*', '*']
+    linespec               =   []
 
-    explicit_model, interp, NLTE = params.get_keywords()
-    
-    df = params.get_dataframe()
+    try:
+        explicit_model, interp, NLTE = params.get_keywords()
+        
+        df = params.get_dataframe()
 
-    # Scelta del modello basata sui parametri espliciti e sull'interpolazione
-    if (explicit_model == 'False') & (interp == 'True'):
-        param = df.at[k, 'Model'].split(",")
-        Teff, logg = int(param[0]), float(param[1])
-        models = model_maker.select_models_for_interpolation(Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'])
-        model = model_maker.write_interpolator(
-            Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'], modelpath, models
-        )
-    elif (explicit_model == 'False') & (interp.lower() == "nearest"):
-        param = df.at[k, 'Model'].split(",")
-        Teff, logg = int(param[0]), float(param[1])
-        model = model_maker.select_nearest_model(Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'], modelpath)
-    elif (explicit_model == 'True') & (interp == 'False'):
-        model = df.at[k, 'Model'].split(",")[0]
-        source_model = os.path.join(dataset_model_path, model)
-        target_model = os.path.join(modelpath, model)
-        if not os.path.exists(target_model):
-            shutil.copy2(source_model, target_model)
+        # Scelta del modello basata sui parametri espliciti e sull'interpolazione
+        if (explicit_model == 'False') & (interp == 'True'):
+            param = df.at[k, 'Model'].split(",")
+            Teff, logg = int(param[0]), float(param[1])
+            models = model_maker.select_models_for_interpolation(Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'])
+            model = model_maker.write_interpolator(
+                Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'], modelpath, models
+            )
+        elif (explicit_model == 'False') & (interp.lower() == "nearest"):
+            param = df.at[k, 'Model'].split(",")
+            Teff, logg = int(param[0]), float(param[1])
+            model = model_maker.select_nearest_model(Teff, logg, df.at[k, '[Fe/H]'], df.at[k, 'xi'], df.at[k, 'chemistry'], modelpath)
+        elif (explicit_model == 'True') & (interp == 'False'):
+            model = df.at[k, 'Model'].split(",")[0]
+            source_model = os.path.join(dataset_model_path, model)
+            target_model = os.path.join(modelpath, model)
+            if not os.path.exists(target_model):
+                shutil.copy2(source_model, target_model)
 
-    dict_linelist = params.process_solar_references(df.at[k, 'linelist_file'], df.at[k, 'abu_file'], df.at[k, '[Fe/H]'])
-    linespec = dict_linelist['linelist_content']
-    Crat = dict_linelist['Crat']
-    isotopic_n = 612613
+        dict_linelist = params.process_solar_references(df.at[k, 'linelist_file'], df.at[k, 'abu_file'], df.at[k, '[Fe/H]'])
+        linespec = dict_linelist['linelist_content']
+        Crat = dict_linelist['Crat']
+        isotopic_n = 612613
 
-    # Gestione degli elementi singoli
-    keyword, keyvec = params.read_single_element(df.at[k, 'monoelem'])
-    if keyword == 'Yes':
-        linespec = linelist_manager.create_linelist_single_element(linelistpath, linespec, keyvec)
+        # Gestione degli elementi singoli
+        keyword, keyvec = params.read_single_element(df.at[k, 'monoelem'])
+        if keyword == 'Yes':
+            linespec = linelist_manager.create_linelist_single_element(linelistpath, linespec, keyvec)
 
-    # Lettura dei file di abbondanza
-    df_abu, _ = params.read_abu_file(df.at[k, 'abu_file'])
-    elem = np.array(df_abu['AtomicNumber'], dtype=float, copy=True)
-    deltaabu = np.array(df_abu['AbundanceDifference'], dtype=float, copy=True)
-    override_z, override_xfe, override_tag = _read_explicit_xfe_override(df.iloc[k])
-    if Crat is None or len(Crat) == 0:
-        isotopic_n = 0
-        isotopic_val = 0.0
-    else:
-        isotopic_val = Crat.iloc[0]
-
-    # Aggiornamento delle abbondanze in base a [a/Fe]
-    if df.at[k, '[a/Fe]'] != 0.:
-        alpha = df.at[k, '[a/Fe]']
-        for element in [8, 12, 14, 16, 20, 22]:
-            deltaabu[elem == element] = alpha
-
-    # Priorità massima: override esplicito [X/Fe] da input.ts
-    if override_z is not None:
-        mask = (elem == float(override_z))
-        if mask.any():
-            deltaabu[mask] = override_xfe
+        # Lettura dei file di abbondanza
+        df_abu, _ = params.read_abu_file(df.at[k, 'abu_file'])
+        elem = np.array(df_abu['AtomicNumber'], dtype=float, copy=True)
+        deltaabu = np.array(df_abu['AbundanceDifference'], dtype=float, copy=True)
+        override_z, override_xfe, override_tag = _read_explicit_xfe_override(df.iloc[k])
+        if Crat is None or len(Crat) == 0:
+            isotopic_n = 0
+            isotopic_val = 0.0
         else:
-            elem = np.append(elem, float(override_z))
-            deltaabu = np.append(deltaabu, float(override_xfe))
+            isotopic_val = Crat.iloc[0]
 
-    abu = params.solar_reference(elem, deltaabu, df.at[k, '[Fe/H]'])
+        # Aggiornamento delle abbondanze in base a [a/Fe]
+        if df.at[k, '[a/Fe]'] != 0.:
+            alpha = df.at[k, '[a/Fe]']
+            for element in [8, 12, 14, 16, 20, 22]:
+                deltaabu[elem == element] = alpha
 
-    # Computazione dello spettro
-    start = time.time()
-    namefile = turbo_spec_writer.writer(model, df.at[k, '[Fe/H]'], df.at[k, '[a/Fe]'], df.at[k, 'lam_i'], df.at[k, 'lam_f'],
-                                        df.at[k, 'xi'], linespec, df.at[k, 'snr'], elem, abu, isotopic_n,
-                                        isotopic_val, keyw=keyword, el=keyvec[2], ext=df.at[k, 'extension'], deltalam=df.at[k, 'resnum'],
-                                        interp=interp, NLTE=NLTE, abundance_tag=override_tag)
-    if namefile != 'STOP':
-        if verbose:
-            print("Computing spectrum:", namefile)
-        com_path = os.path.join(launchpath, namefile + '.com')
-        log_filename = f"log_{os.path.splitext(namefile)[0]}.txt"
-        log_path = os.path.join(launchpath, log_filename)
-        with open(log_path, "w") as log_handle:
-            proc = subprocess.run([com_path], stdout=log_handle, stderr=subprocess.STDOUT, check=False)
+        # Priorità massima: override esplicito [X/Fe] da input.ts
+        if override_z is not None:
+            mask = (elem == float(override_z))
+            if mask.any():
+                deltaabu[mask] = override_xfe
+            else:
+                elem = np.append(elem, float(override_z))
+                deltaabu = np.append(deltaabu, float(override_xfe))
 
-        raw_output_path = os.path.join(savepath, namefile)
-        if proc.returncode != 0 or (not os.path.exists(raw_output_path)) or os.path.getsize(raw_output_path) == 0:
-            print(f"ERROR: Turbospectrum failed for {namefile}. Check log: {log_path}")
-            problem_list.append(namefile)
-            if pbar:
-                pbar.update(1)
-            return
+        abu = params.solar_reference(elem, deltaabu, df.at[k, '[Fe/H]'])
 
-        header.create_combined_header(namefile, model=model, met=df.at[k, '[Fe/H]'], alpha=df.at[k, '[a/Fe]'], elem=elem,
-                                      deltaabu=deltaabu, lam_min=df.at[k, 'lam_i'], lam_max=df.at[k, 'lam_f'],
-                                      xi=df.at[k, 'xi'], isotopic_n=isotopic_n, isotopic_val=isotopic_val,
-                                      keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'resnum'])
-        end = time.time()
-        if verbose:
-            params.print_time(end - start)
+        # Computazione dello spettro
+        start = time.time()
+        namefile = turbo_spec_writer.writer(model, df.at[k, '[Fe/H]'], df.at[k, '[a/Fe]'], df.at[k, 'lam_i'], df.at[k, 'lam_f'],
+                                            df.at[k, 'xi'], linespec, df.at[k, 'snr'], elem, abu, isotopic_n,
+                                            isotopic_val, keyw=keyword, el=keyvec[2], ext=df.at[k, 'extension'], deltalam=df.at[k, 'resnum'],
+                                            interp=interp, NLTE=NLTE, abundance_tag=override_tag)
+        if namefile != 'STOP':
+            if verbose:
+                print("Computing spectrum:", namefile)
+            com_path = os.path.join(launchpath, namefile + '.com')
+            log_filename = f"log_{os.path.splitext(namefile)[0]}.txt"
+            log_path = os.path.join(launchpath, log_filename)
+            with open(log_path, "w") as log_handle:
+                proc = subprocess.run([com_path], stdout=log_handle, stderr=subprocess.STDOUT, check=False)
 
-        # Convoluzione dello spettro
-        try:
-            namefile = spectrum_convolver.instrbroad(namefile, df.at[k, 'RES'], verbose='no')
+            raw_output_path = os.path.join(savepath, namefile)
+            if proc.returncode != 0 or (not os.path.exists(raw_output_path)) or os.path.getsize(raw_output_path) == 0:
+                print(f"ERROR: Turbospectrum failed for {namefile}. Check log: {log_path}")
+                problem_list.append(namefile)
+                if pbar:
+                    pbar.update(1)
+                return
+
             header.create_combined_header(namefile, model=model, met=df.at[k, '[Fe/H]'], alpha=df.at[k, '[a/Fe]'], elem=elem,
                                           deltaabu=deltaabu, lam_min=df.at[k, 'lam_i'], lam_max=df.at[k, 'lam_f'],
                                           xi=df.at[k, 'xi'], isotopic_n=isotopic_n, isotopic_val=isotopic_val,
-                                          keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'sampl'], res=df.at[k, 'RES'])
-        except (ValueError, FileNotFoundError):
+                                          keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'resnum'])
+            end = time.time()
             if verbose:
-                print('ERROR IN COMPUTING SPECTRUM!!!!!!')
-            problem_list.append(namefile)
-            failed_output = os.path.join(savepath, namefile)
-            if os.path.exists(failed_output):
-                os.remove(failed_output)
+                params.print_time(end - start)
 
-        linelist_manager.delete_tmp_linelist(linelistpath, linespec, keyvec, keyword)
-        
-        if (df.at[k, 'sampl']!='*') & (df.at[k, 'snr']=='*'):
-            resampler = SpectrumResampler(savepath, namefile, df.at[k, 'sampl'])
-            resampler.resample_and_save()
-            print('Spectrum resampled at ', df.at[k, 'sampl'], 'Å')
+            # Convoluzione dello spettro
+            try:
+                namefile = spectrum_convolver.instrbroad(namefile, df.at[k, 'RES'], verbose='no')
+                header.create_combined_header(namefile, model=model, met=df.at[k, '[Fe/H]'], alpha=df.at[k, '[a/Fe]'], elem=elem,
+                                              deltaabu=deltaabu, lam_min=df.at[k, 'lam_i'], lam_max=df.at[k, 'lam_f'],
+                                              xi=df.at[k, 'xi'], isotopic_n=isotopic_n, isotopic_val=isotopic_val,
+                                              keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'sampl'], res=df.at[k, 'RES'])
+            except (ValueError, FileNotFoundError):
+                if verbose:
+                    print('ERROR IN COMPUTING SPECTRUM!!!!!!')
+                problem_list.append(namefile)
+                failed_output = os.path.join(savepath, namefile)
+                if os.path.exists(failed_output):
+                    os.remove(failed_output)
 
-        elif (df.at[k, 'sampl']!='*') & (df.at[k, 'snr']!='*'):
-            resampler = SpectrumResampler(savepath, namefile, df.at[k, 'sampl'])
-            resampler.resample_and_save()
-            spectrum_noise_adder   =   SpectrumNoiseAdder(savepath, namefile, df.at[k, 'snr'], noise_type='GAUSS')
-            namefile = spectrum_noise_adder.add_noise_and_save()            
-            print('Spectrum resampled at ', df.at[k, 'sampl'], 'Å')
-            print('Added noise for SNR =', df.at[k, 'snr'])
-        else:
+            if (df.at[k, 'sampl']!='*') & (df.at[k, 'snr']=='*'):
+                resampler = SpectrumResampler(savepath, namefile, df.at[k, 'sampl'])
+                resampler.resample_and_save()
+                print('Spectrum resampled at ', df.at[k, 'sampl'], 'Å')
+
+            elif (df.at[k, 'sampl']!='*') & (df.at[k, 'snr']!='*'):
+                resampler = SpectrumResampler(savepath, namefile, df.at[k, 'sampl'])
+                resampler.resample_and_save()
+                spectrum_noise_adder   =   SpectrumNoiseAdder(savepath, namefile, df.at[k, 'snr'], noise_type='GAUSS')
+                namefile = spectrum_noise_adder.add_noise_and_save()
+                print('Spectrum resampled at ', df.at[k, 'sampl'], 'Å')
+                print('Added noise for SNR =', df.at[k, 'snr'])
+        elif namefile == 'STOP':
+            if verbose:
+                print('STOP')
+    except FileNotFoundError as exc:
+        missing_path = exc.filename if getattr(exc, 'filename', None) else str(exc)
+        message = f"Row {k}: missing required file {missing_path}"
+        print(f"ERROR: {message}")
+        problem_list.append(message)
+        if pbar:
+            pbar.update(1)
+        return
+    finally:
+        try:
+            linelist_manager.delete_tmp_linelist(linelistpath, linespec, keyvec, keyword)
+        except OSError:
             pass
-    elif namefile == 'STOP':
-        if verbose:
-            print('STOP')
 
     if pbar:
         pbar.update(1)
 
 def run_cli():
     cli_args = parse_arguments()
-    initialize_runtime(cli_args)
+    if not initialize_runtime(cli_args):
+        return
     print_runtime_summary()
 
     print("\n****************************************************************\n")
