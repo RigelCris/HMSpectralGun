@@ -273,7 +273,7 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
                 print('STOP')
     except FileNotFoundError as exc:
         missing_path = exc.filename if getattr(exc, 'filename', None) else str(exc)
-        message = f"Row {k}: missing required file {missing_path}"
+        message = f"Row {k + 1}: missing required file {missing_path}"
         print(f"ERROR: {message}")
         problem_list.append(message)
         if pbar:
