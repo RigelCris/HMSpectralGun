@@ -5,7 +5,24 @@ HMSpectralGun generates synthetic stellar spectra using Turbospectrum.
 ## Quick start (clone-and-run)
 
 1. Clone the repository.
-2. Create a Python environment and install dependencies:
+2. Make sure `TurboSpectrum` is already installed on your machine.
+
+You need a working TurboSpectrum installation before running HMSpectralGun. In particular, you must know the paths to:
+
+- the `exec-gf` directory containing the TurboSpectrum executables
+- the `COM/santerre` directory used to launch the workflow
+
+3. Download the MARCS model grid separately and place the model files in `./marcs_generator/dataset/`.
+
+HMSpectralGun does not ship the full MARCS model dataset. Download the MARCS models you need and copy or extract the `.mod` files into:
+
+```bash
+marcs_generator/dataset/
+```
+
+If you keep the MARCS dataset somewhere else, set `HMSPECTRALGUN_DATASET_MODEL_PATH` to that directory.
+
+4. Create a Python environment and install dependencies:
 
 ```bash
 python3 -m venv .venv
@@ -13,7 +30,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Export runtime paths for your Turbospectrum installation:
+5. Export runtime paths for your TurboSpectrum installation:
 
 ```bash
 export HMSPECTRALGUN_EXEC_PATH="/path/to/turbospectrum/exec-gf"
@@ -29,7 +46,7 @@ Optional overrides:
 - `HMSPECTRALGUN_INTERPOLATOR_EXE` (default: `./marcs_generator/interpol_modeles`)
 - `HMSPECTRALGUN_BABSMA` and `HMSPECTRALGUN_BSYN` (if you prefer explicit executable paths)
 
-4. Prepare your `input.ts` and run:
+6. Prepare your `input.ts` and run:
 
 ```bash
 python main.py --input input.ts --progress
