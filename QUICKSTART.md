@@ -12,7 +12,7 @@ cd HMSpectralGun
 You need the paths to:
 
 - `.../exec-gf`
-- `.../COM/santerre`
+- `.../COM`
 
 3. Download the MARCS model grid separately.
 
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 
 ```bash
 export HMSPECTRALGUN_EXEC_PATH="/path/to/turbospectrum/exec-gf"
-export HMSPECTRALGUN_LAUNCH_PATH="/path/to/turbospectrum/COM/santerre"
+export HMSPECTRALGUN_LAUNCH_PATH="/path/to/turbospectrum/COM"
 ```
 
 Optional:
