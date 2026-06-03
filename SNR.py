@@ -4,6 +4,7 @@
 import pandas as pd
 from io import StringIO
 import numpy as np
+import os
 
 class SpectrumNoiseAdder:
     def __init__(self, savepath, input_file, snr, noise_type='GAUSS'):
@@ -16,7 +17,7 @@ class SpectrumNoiseAdder:
         self._read_file()
 
     def _read_file(self):
-        with open(self.savepath+self.input_file, 'r') as file:
+        with open(os.path.join(self.savepath, self.input_file), 'r') as file:
             lines = file.readlines()
         
         header_lines = []
@@ -43,7 +44,7 @@ class SpectrumNoiseAdder:
         return f"{base}_SNR{self.snr}.{ext}"
 
     def _write_file(self, output_file):
-        with open(self.savepath+output_file, 'w') as file:
+        with open(os.path.join(self.savepath, output_file), 'w') as file:
             k = 0
             for line in self.header:
                 if k ==10:

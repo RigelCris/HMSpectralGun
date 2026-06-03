@@ -373,7 +373,7 @@ class InputParameters:
 
 """
 # Esempio di utilizzo
-filename = '/Users/cristiano.fanelli/ASTRO/softw/Turbospectrum2019-master/COM-v19.1/santerre/input.ts'
+filename = '/Users/cristiano.fanelli/ASTRO/softw/Turbospectrum2019-master/COM-v19.1/input.ts'
 params = InputParameters(filename)
 print(params.get_paths())
 print(params.get_keywords())

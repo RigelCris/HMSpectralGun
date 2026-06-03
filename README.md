@@ -10,7 +10,7 @@ HMSpectralGun generates synthetic stellar spectra using Turbospectrum.
 You need a working TurboSpectrum installation before running HMSpectralGun. In particular, you must know the paths to:
 
 - the `exec-gf` directory containing the TurboSpectrum executables
-- the `COM/santerre` directory used to launch the workflow
+- the `COM` directory where HMSpectralGun writes and launches the generated `.com` scripts
 
 3. Download the MARCS model grid separately and place the model files in `./marcs_generator/dataset/`.
 
@@ -34,7 +34,7 @@ pip install -r requirements.txt
 
 ```bash
 export HMSPECTRALGUN_EXEC_PATH="/path/to/turbospectrum/exec-gf"
-export HMSPECTRALGUN_LAUNCH_PATH="/path/to/turbospectrum/COM/santerre"
+export HMSPECTRALGUN_LAUNCH_PATH="/path/to/turbospectrum/COM"
 ```
 
 Linux note: generated `.com` scripts use `csh` (`#!/bin/csh -f`), so install `csh`/`tcsh` if missing.

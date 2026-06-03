@@ -283,13 +283,13 @@ class TurboSpecWriter:
         return script_name
 
 """
-filename = '/Users/cfanelli/astro/softw/Turbospectrum2019-master/COM-v19.1/santerre/input.ts'
+filename = '/Users/cfanelli/astro/softw/Turbospectrum2019-master/COM-v19.1/input.ts'
 
 params = InputParameters('input.ts')
 params.decisor_model(params.get_keywords()[1])
 save_path, linelist_path, model_path = params.get_paths()
 
-launch_path = '/Users/cfanelli/astro/softw/Turbospectrum2019-master/COM-v19.1/santerre/'
+launch_path = '/Users/cfanelli/astro/softw/Turbospectrum2019-master/COM-v19.1/COM/'
 
 turbo_spec = TurboSpec_writer(model_path, launch_path, save_path, linelist_path)
 

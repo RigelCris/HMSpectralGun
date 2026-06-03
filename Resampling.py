@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from io import StringIO
+import os
 
 class SpectrumResampler:
     def __init__(self, savepath, input_file, resampl):
@@ -16,7 +17,7 @@ class SpectrumResampler:
         self._read_file()
 
     def _read_file(self):
-        with open(self.savepath+self.input_file, 'r') as file:
+        with open(os.path.join(self.savepath, self.input_file), 'r') as file:
             lines = file.readlines()
         
         header_lines = []
@@ -69,7 +70,7 @@ class SpectrumResampler:
         self._resample_data()
         #output_file = self._generate_output_filename()
         output_file = self.input_file
-        self._write_file(self.savepath+output_file)
+        self._write_file(os.path.join(self.savepath, output_file))
         return output_file
 
 # Utilizzo della classe

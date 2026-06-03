@@ -72,7 +72,7 @@ class ModelCreator:
 # Instantiate ModelCreator
 model_creator = ModelCreator(
     model_path='/Users/cristiano.fanelli/ASTRO/softw/Turbospectrum2019-master/COM-v19.1/models/',
-    dataset_model_path='/Users/cristiano.fanelli/ASTRO/softw/Turbospectrum2019-master/COM-v19.1/santerre/marcs_generator/dataset/')
+    dataset_model_path='/Users/cristiano.fanelli/ASTRO/softw/Turbospectrum2019-master/COM-v19.1/marcs_generator/dataset/')
 
 # Create model based on terminal arguments
 model = model_creator.create_model(Teff=Teff, logg=logg, xi=xi, met=met, chem=mixture, interpolate=interpolate, name_model=name_model)

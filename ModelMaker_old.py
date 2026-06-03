@@ -136,7 +136,7 @@ class ModelMaker:
                 file.write("set model_out2 = ${model_path}${name_model}.alt \n\n")
                 file.write("set test = '.false.' \n")
                 file.write(f"set model_test = '{model_path}/{model1}' \n\n")
-                file.write("/Users/cfanelli/astro/softw/TS-NLTE/COM/santerre/HMSpectralGun/marcs_generator/interpol_modeles <<EOF \n")
+                file.write("./marcs_generator/interpol_modeles <<EOF \n")
                 file.write("'${dataset_model_path}/${model1}' \n")
                 file.write("'${dataset_model_path}/${model2}' \n")
                 file.write("'${dataset_model_path}/${model3}' \n")

@@ -44,6 +44,65 @@ def parse_arguments():
     parser.add_argument('--progress', action='store_true', help='Show a progress bar')
     return parser.parse_args()
 
+
+args = None
+current_path = None
+input_file = None
+runtime = None
+dataset_model_path = None
+launchpath = None
+interpolator_exe = None
+params = None
+savepath = None
+linelistpath = None
+modelpath = None
+turbo_spec_writer = None
+problem_list = []
+
+
+def initialize_runtime(cli_args):
+    """Initialize CLI runtime state without doing work at import time."""
+    global args, current_path, input_file, runtime, dataset_model_path
+    global launchpath, interpolator_exe, params, savepath, linelistpath
+    global modelpath, turbo_spec_writer, problem_list
+
+    args = cli_args
+    current_path = os.getcwd()
+    input_file = os.path.join(current_path, args.input)
+    runtime = resolve_runtime_paths(project_root=os.path.dirname(os.path.abspath(__file__)))
+    validate_turbospectrum_paths(runtime)
+    dataset_model_path = runtime["dataset_model_path"]
+    launchpath = runtime["launch_path"]
+    interpolator_exe = runtime["interpolator_exe"]
+    params = InputParameters(input_file)
+    savepath, linelistpath, modelpath = params.get_paths()
+    turbo_spec_writer = TurboSpecWriter(
+        savepath,
+        linelistpath,
+        modelpath,
+        launchpath,
+        babsma_exec=runtime["babsma_exec"],
+        bsyn_exec=runtime["bsyn_exec"],
+        contopac_path=runtime["contopac_path"],
+    )
+    problem_list = []
+
+
+def print_runtime_summary():
+    """Print resolved runtime paths for the current CLI run."""
+    Intro.intro1()
+    print('\n***  List of Paths  ***')
+    print(f"Save Path: {savepath}")
+    print(f"Linelist Path: {linelistpath}")
+    print(f"Model Path: {modelpath}")
+    print(f"Launch Path: {launchpath}")
+    print(f"Dataset Path: {dataset_model_path}")
+    print(f"Interpolator: {interpolator_exe}")
+    print(f"babsma_lu: {runtime['babsma_exec']}")
+    print(f"bsyn_lu: {runtime['bsyn_exec']}")
+    print(f"Contopac: {runtime['contopac_path']}")
+    print(f"Current Path: {current_path}")
+
 def _read_explicit_xfe_override(row):
     z_raw = row.get('override_elem', '*')
     xfe_raw = row.get('override_xfe', '*')
@@ -61,6 +120,8 @@ def _read_explicit_xfe_override(row):
 
 def main(k=0, show_progress=False, verbose=False, pbar=None):
     """Main function to process spectra based on input parameters."""
+    if params is None:
+        raise RuntimeError("Runtime not initialized. Execute main.py as a script or call initialize_runtime().")
     
     # Inizializzazione delle classi con i rispettivi parametri
     linelist_manager       =   LineListManager()  # Assumendo che non richieda parametri
@@ -171,8 +232,9 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
             if verbose:
                 print('ERROR IN COMPUTING SPECTRUM!!!!!!')
             problem_list.append(namefile)
-            os.system('rm ' + savepath + namefile + '.spec')
-            pass
+            failed_output = os.path.join(savepath, namefile)
+            if os.path.exists(failed_output):
+                os.remove(failed_output)
 
         linelist_manager.delete_tmp_linelist(linelistpath, linespec, keyvec, keyword)
         
@@ -197,47 +259,15 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
     if pbar:
         pbar.update(1)
 
-# Parsing degli argomenti e inizializzazione delle variabili globali
-args = parse_arguments()
-current_path = os.getcwd()
-input_file = os.path.join(current_path, args.input)
-runtime = resolve_runtime_paths(project_root=os.path.dirname(os.path.abspath(__file__)))
-validate_turbospectrum_paths(runtime)
-dataset_model_path = runtime["dataset_model_path"]
-launchpath = runtime["launch_path"]
-interpolator_exe = runtime["interpolator_exe"]
-params = InputParameters(input_file)
-savepath, linelistpath, modelpath = params.get_paths()
-turbo_spec_writer = TurboSpecWriter(
-    savepath,
-    linelistpath,
-    modelpath,
-    launchpath,
-    babsma_exec=runtime["babsma_exec"],
-    bsyn_exec=runtime["bsyn_exec"],
-    contopac_path=runtime["contopac_path"],
-)
+def run_cli():
+    cli_args = parse_arguments()
+    initialize_runtime(cli_args)
+    print_runtime_summary()
 
-# Introduzione e stampa dei percorsi
-Intro.intro1()
-print('\n***  List of Paths  ***')
-print(f"Save Path: {savepath}")
-print(f"Linelist Path: {linelistpath}")
-print(f"Model Path: {modelpath}")
-print(f"Launch Path: {launchpath}")
-print(f"Dataset Path: {dataset_model_path}")
-print(f"Interpolator: {interpolator_exe}")
-print(f"babsma_lu: {runtime['babsma_exec']}")
-print(f"bsyn_lu: {runtime['bsyn_exec']}")
-print(f"Contopac: {runtime['contopac_path']}")
-print(f"Current Path: {current_path}")
-
-if __name__ == '__main__':
     print("\n****************************************************************\n")
     number_of_spec = params.write_output_spectra_count()
     print("****************************************************************\n")
 
-    problem_list = []
     turbo_spec_writer.check_and_create_contopacdir()
 
     # Elaborazione degli spettri
@@ -259,4 +289,8 @@ if __name__ == '__main__':
         for problem in problem_list:
             print(problem)
         print("\n\n")
+
+
+if __name__ == '__main__':
+    run_cli()
     

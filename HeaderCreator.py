@@ -117,7 +117,7 @@ class HeaderCreator:
 
 """
 # Esempio di utilizzo della classe
-launch_path = '/Users/cristiano.fanelli/ASTRO/softw/TS-NLTE/COM/santerre/'
+launch_path = '/Users/cristiano.fanelli/ASTRO/softw/TS-NLTE/COM/'
 save_path = '/Users/cristiano.fanelli/ASTRO/softw/TS-NLTE/COM/syntspec/'
 creator = HeaderCreator(launch_path, save_path)
 
