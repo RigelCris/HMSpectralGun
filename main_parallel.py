@@ -247,7 +247,6 @@ def worker(k):
         )
 
         final_name = raw_name
-        keep_raw_name = raw_name
 
         # 5) Convoluzione (silenziosa se manca il file output o RES non valido)
         try:
@@ -263,10 +262,10 @@ def worker(k):
                 keyw=row['chemistry'], deltalam=row['resnum'], res=row['RES'],
                 log_filename=log_filename
             )
-            # Mantieni anche il file raw, ma rinominalo per evitare collisioni fra worker.
+            # Mantieni anche il file raw, rinominandolo come gli altri output del worker.
             if os.path.exists(raw_output_path):
-                keep_raw_name = _tag_output_name(raw_name, f"raw_k{k}")
-                os.replace(raw_output_path, os.path.join(savepath, keep_raw_name))
+                unique_raw_name = _tag_output_name(raw_name, f"k{k}")
+                os.replace(raw_output_path, os.path.join(savepath, unique_raw_name))
             final_name = conv_name
         except (ValueError, FileNotFoundError):
             # Nessuna convoluzione: mantieni il file raw.
