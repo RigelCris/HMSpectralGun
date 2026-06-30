@@ -29,6 +29,12 @@ class TurboSpecWriter:
             self.contopac_path = contopac_path
         self.contopac_path = self.contopac_path.rstrip("/")
 
+    def ensure_output_directory(self):
+        """
+        Create the destination directory for synthetic spectra if needed.
+        """
+        os.makedirs(self.save_path, exist_ok=True)
+
     def explicit_marcs(self, model_name):
         """
         Reads a model file and determines if the MARCS condition is true or false.
@@ -88,6 +94,8 @@ class TurboSpecWriter:
         """
         if not isinstance(model_name, str):
             raise ValueError("model_name should be a string")
+
+        self.ensure_output_directory()
 
         # Determine the model name format using regex
         interp_mode = str(interp).strip().lower()

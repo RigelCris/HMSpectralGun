@@ -48,6 +48,8 @@ Optional overrides:
 
 6. Prepare your `input.ts` and run:
 
+`savepath` is created automatically if it does not exist yet.
+
 ```bash
 python main.py --input input.ts --progress
 ```
