@@ -141,7 +141,7 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
     
     # Inizializzazione delle classi con i rispettivi parametri
     linelist_manager       =   LineListManager()  # Assumendo che non richieda parametri
-    model_maker            =   ModelMaker(dataset_model_path, interpolator_exe=interpolator_exe)
+    model_maker            =   ModelMaker(dataset_model_path, interpolator_exe=interpolator_exe, geometry=params.geometry)
     header                 =   HeaderCreator(launchpath, savepath)
     spectrum_convolver     =   SpectrumConvolver(savepath)  # Assumendo che non richieda parametri
     keyword                =   'No'
@@ -215,7 +215,7 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
         namefile = turbo_spec_writer.writer(model, df.at[k, '[Fe/H]'], df.at[k, '[a/Fe]'], df.at[k, 'lam_i'], df.at[k, 'lam_f'],
                                             df.at[k, 'xi'], linespec, df.at[k, 'snr'], elem, abu, isotopic_n,
                                             isotopic_val, keyw=keyword, el=keyvec[2], ext=df.at[k, 'extension'], deltalam=df.at[k, 'resnum'],
-                                            interp=interp, NLTE=NLTE, abundance_tag=override_tag)
+                                            interp=interp, NLTE=NLTE, abundance_tag=override_tag, geometry=params.geometry)
         if namefile != 'STOP':
             if verbose:
                 print("Computing spectrum:", namefile)

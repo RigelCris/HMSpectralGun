@@ -204,6 +204,7 @@ def worker(k):
             keyw=kw, el=keyvec[2],
             ext=row['extension'], deltalam=row['resnum'],
             interp=params.get_keywords()[1],
+            geometry=params.geometry,
             NLTE=params.get_keywords()[2],
             abundance_tag=override_tag
         )
@@ -366,7 +367,7 @@ if __name__ == '__main__':
     kws    = params0.get_keywords()
 
     # Mappatura modelli
-    mm        = ModelMaker(dataset_dp, interpolator_exe=runtime["interpolator_exe"])
+    mm        = ModelMaker(dataset_dp, interpolator_exe=runtime["interpolator_exe"], geometry=params0.geometry)
     model_map = {}
     missing_explicit_models = []
     for k in range(n_spec):

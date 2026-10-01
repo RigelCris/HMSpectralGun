@@ -6,6 +6,11 @@ import os
 from os.path import exists
 import re
 
+try:
+    from .model_geometry import atmosphere_geometry
+except ImportError:
+    from model_geometry import atmosphere_geometry
+
 class TurboSpecWriter:
     def __init__(
         self,
@@ -66,7 +71,7 @@ class TurboSpecWriter:
         else:
             print("CONTOPAC directory already exists.")
 
-    def writer(self, model_name, metallic, alpha, lam_min, lam_max, turbvel, linespec, lineseqw, elem, abu, isotopic_n, isotopic_val, keyw, el, ext, deltalam='0.01', interp='True', NLTE=False, abundance_tag=''):
+    def writer(self, model_name, metallic, alpha, lam_min, lam_max, turbvel, linespec, lineseqw, elem, abu, isotopic_n, isotopic_val, keyw, el, ext, deltalam='0.01', interp='True', NLTE=False, abundance_tag='', geometry='auto'):
         """
         Writes a script for running the Turbospectrum software with specific parameters.
 
@@ -104,7 +109,7 @@ class TurboSpecWriter:
 
         if interp_mode == 'false':
             # Explicit models can contain additional tags (m1.0_t02_st_...).
-            # We only need log(g) to set the spherical flag robustly.
+            # Gravity is used for output naming; geometry is read from the atmosphere.
             gravity_match = re.search(r'_g([+-]?\d+(?:\.\d+)?)', model_name)
             if gravity_match:
                 gg = float(gravity_match.group(1))
@@ -123,12 +128,14 @@ class TurboSpecWriter:
                 raise ValueError(f"Invalid explicit model name format: {model_name}")
 
         elif interp_mode == 'true':
-            match = re.match(r'T(\d+)_G([pm]\d+\.\d+)_.*_Z([pm]\d+\.\d+)\.interpol', model_name)
+            match = re.match(r'T(\d+)_G([pm]\d+\.\d+)_.*_Z([pm]\d+\.\d+)(?:_xi\d+\.\d+)?\.interpol', model_name)
             if match:
                 TT = float(match.group(1))
                 gg = float(match.group(2)[1:]) if match.group(2)[0] == 'p' else -float(match.group(2)[1:])
                 GG = f"{gg:.2f}"
-                model_name_format = model_name.split('Z')[0][:-4]
+                # Keep the historical spectrum filename even though the cached
+                # atmosphere name now also contains geometry and atmospheric xi.
+                model_name_format = f"T{match.group(1)}_G{match.group(2)}"
             else:
                 raise ValueError(f"Invalid model name format: {model_name}")
 
@@ -140,18 +147,17 @@ class TurboSpecWriter:
             if match:
                 gg = float(match.group(2)[1:]) if match.group(2)[0] == 'p' else -float(match.group(2)[1:])
                 GG = f"{gg:.2f}"
-                model_name_format = model_name.split(".mod")[0] #f't{TT}_g{GG}'
+                # The copied nearest atmosphere has a collision-safe internal
+                # name; spectra retain the former T..._G... prefix.
+                model_name_format = f"T{match.group(1)}_G{match.group(2)}"
             else:
                 raise ValueError(f"Invalid nearest model name format: {model_name}")
         else:
             raise ValueError(f"Unsupported interp mode: {interp}")
 
 
-        # Determine spherical parameter
-        spherical = 'T'
-        ###########print('!!!OVERWRITTEN PP MODEL FOR TS BUG!!!')
-        if (float(GG) >= 4):
-             spherical = 'F'
+        actual_geometry = atmosphere_geometry(os.path.join(self.model_path, model_name), geometry)
+        spherical = 'T' if actual_geometry == 'spherical' else 'F'
 
         # Format metallicity and alpha values
         sgnm = 'm' if metallic < 0 else 'p'

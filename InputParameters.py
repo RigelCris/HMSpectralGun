@@ -11,6 +11,11 @@ from os.path import exists
 import pandas as pd
 
 
+try:
+    from .model_geometry import normalize_geometry
+except ImportError:
+    from model_geometry import normalize_geometry
+
 class InputParameters:
     """
     Classe per gestire i parametri di input per la sintesi degli spettri.
@@ -69,6 +74,7 @@ class InputParameters:
         self.keyword1 = None
         self.keyword2 = None
         self.keyword3 = None
+        self.geometry = "auto"
         self.df = None
         self.linelist_file_content = None
         self.abu_file_content = None
@@ -120,20 +126,52 @@ class InputParameters:
             lines = file.readlines()
 
         # Rimuovi righe di commento
-        lines = [line.strip() for line in lines if not line.startswith('#')]
+        lines = [line.split('#', 1)[0].strip() for line in lines]
+        lines = [line for line in lines if line]
 
         # Estrai i percorsi
         self.savepath = lines[0].split('\t')[0]
         self.linelistpath = lines[1].split('\t')[0]
         self.modelpath = lines[2].split('\t')[0]
 
-        # Estrai le keyword
-        self.keyword1 = lines[3].split('\t')[0].split('=')[1]     # Explicit model True/False
-        self.keyword2 = lines[4].split('\t')[0].split('=')[1]     # interp model True/False/Nearest
-        self.keyword3 = lines[5].split('\t')[0].split('=')[1]     # interp model True/False/Nearest
+        # Normalize values once for both serial and parallel execution.
+        def read_keyword(line, name, allowed, aliases=()):
+            key, separator, value = line.partition('=')
+            accepted_names = (name, *aliases)
+            if not separator or key.strip().lower() not in {
+                accepted_name.lower() for accepted_name in accepted_names
+            }:
+                expected = " or ".join(f"{accepted_name}=..." for accepted_name in accepted_names)
+                raise ValueError(f"Expected {expected}; got {line!r}")
+            value = value.strip().lower()
+            if value not in allowed:
+                raise ValueError(f"Invalid {name}={value!r}; allowed: {', '.join(allowed)}")
+            return allowed[value]
+
+        booleans = {'true': 'True', 'false': 'False'}
+        self.keyword1 = read_keyword(
+            lines[3], 'ExplicitModel', booleans, aliases=('Explicit',)
+        )
+        self.keyword2 = read_keyword(lines[4], 'interp', {
+            **booleans, 'interp': 'True', 'nearest': 'Nearest',
+        })
+        self.keyword3 = read_keyword(lines[5], 'NLTE', booleans)
+        if (self.keyword1, self.keyword2) not in {
+            ('False', 'True'), ('False', 'Nearest'), ('True', 'False'),
+        }:
+            raise ValueError(
+                "Use ExplicitModel=False (or Explicit=False) with interp=True "
+                "(or interp/Nearest), or ExplicitModel=True (or Explicit=True) "
+                "with interp=False"
+            )
 
         # Leggi il resto delle righe come dati tabellari
-        data_lines = lines[6:]
+        data_lines = []
+        for line in lines[6:]:
+            if line.lower().startswith("geometry="):
+                self.geometry = normalize_geometry(line.split("=", 1)[1])
+            else:
+                data_lines.append(line)
 
         data = []
         for line in data_lines:

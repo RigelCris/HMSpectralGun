@@ -27,6 +27,11 @@ from typing import Iterable, List, Sequence, Tuple
 import numpy as np
 
 
+try:
+    from .model_geometry import normalize_geometry, resolve_geometry, atmosphere_geometry
+except ImportError:
+    from model_geometry import normalize_geometry, resolve_geometry, atmosphere_geometry
+
 @dataclass(frozen=True)
 class ModelRecord:
     filename: str
@@ -35,6 +40,7 @@ class ModelRecord:
     xi: float
     chem: str
     met: float
+    geometry: str
 
 
 class ModelSelectionError(RuntimeError):
@@ -56,7 +62,7 @@ class ModelMaker:
     MAX_MET_DELTA = 0.50
 
     MODEL_RE = re.compile(
-        r"^s(?P<teff>\d+(?:\.\d+)?)_"
+        r"^(?P<geometry>[sp])(?P<teff>\d+(?:\.\d+)?)_"
         r"g(?P<logg>[+-]?\d+(?:\.\d+)?)_"
         r"m(?P<mass>\d+(?:\.\d+)?)_"
         r"t(?P<xi>\d+)_"
@@ -69,7 +75,9 @@ class ModelMaker:
         self,
         dataset_model_path: str,
         interpolator_exe: str | None = None,
+        geometry: str = "auto",
     ):
+        self.geometry = normalize_geometry(geometry)
         self.dataset_model_path = Path(dataset_model_path).expanduser()
         if interpolator_exe is None:
             interpolator_exe = str(Path(__file__).resolve().parent / "marcs_generator" / "interpol_modeles")
@@ -197,6 +205,7 @@ class ModelMaker:
 
         return ModelRecord(
             filename=name,
+            geometry="spherical" if match.group("geometry") == "s" else "plane-parallel",
             teff=float(match.group("teff")),
             logg=float(match.group("logg")),
             xi=xi_value,
@@ -205,7 +214,7 @@ class ModelMaker:
         )
 
     def _discover_model_files(self, keyw_chem: str | None = None) -> List[str]:
-        pattern = "s*_m1.0_t*_*.mod" if keyw_chem is None else f"s*_m1.0_t*_{keyw_chem}_z*.mod"
+        pattern = "[sp]*_m*_t*_*.mod" if keyw_chem is None else f"[sp]*_m*_t*_{keyw_chem}_z*.mod"
         files = sorted(path.name for path in self.dataset_model_path.glob(pattern))
 
         # Fallback useful for debugging from an existing list_models file.
@@ -390,7 +399,11 @@ class ModelMaker:
 
     # Function to select models for interpolation
     def select_models_for_interpolation(self, Teff, logg, met, xi, keyw_chem):
-        records = self._load_models(keyw_chem)
+        geometry = resolve_geometry(self.geometry, logg)
+        records = [r for r in self._load_models(keyw_chem) if r.geometry == geometry
+                   and (geometry != "spherical" or "_m1.0_" in r.filename)]
+        if not records:
+            raise SkipModelError(f"No {geometry} models available for chemistry={keyw_chem}")
         models, _, _, _, _ = self._find_valid_cube(
             records=records,
             Teff=float(Teff),
@@ -405,6 +418,10 @@ class ModelMaker:
         if len(models) != 8:
             raise ValueError(f"The MARCS interpolator needs exactly 8 models; got {len(models)}.")
 
+        geometry = resolve_geometry(self.geometry, logg)
+        if any(self._parse_model_name(m).geometry != geometry for m in models):
+            raise ValueError(f"Interpolation requires eight {geometry} models; mixed or incompatible geometry")
+        geometry_tag = "p" if geometry == "plane-parallel" else "s"
         model_path = Path(model_path).expanduser()
         model_path.mkdir(parents=True, exist_ok=True)
 
@@ -418,11 +435,12 @@ class ModelMaker:
         met_abs = f"{abs(met):.2f}"
         teff_label = f"{int(round(Teff))}"
 
-        name_model = f"T{teff_label}_G{sgn_logg}{logg_abs}_{chem}_Z{sgn_met}{met_abs}"
+        name_model = f"T{teff_label}_G{sgn_logg}{logg_abs}_{geometry_tag}_{chem}_Z{sgn_met}{met_abs}_xi{float(xi):.2f}"
         interpol_file = model_path / f"{name_model}.interpol"
         alt_file = model_path / f"{name_model}.alt"
 
         if interpol_file.exists():
+            atmosphere_geometry(interpol_file, geometry)
             return interpol_file.name
 
         print("Interpolating Model Atmosphere...")
@@ -521,11 +539,16 @@ EOF
                 f"MARCS interpolator finished without creating {interpol_file}. See {log_path.resolve()}"
             )
 
+        atmosphere_geometry(interpol_file, geometry)
         return interpol_file.name
 
     # Function to select the nearest model
     def select_nearest_model(self, Teff, logg, met, xi, keyw_chem, model_path):
-        records = self._load_models(keyw_chem)
+        geometry = resolve_geometry(self.geometry, logg)
+        records = [r for r in self._load_models(keyw_chem) if r.geometry == geometry
+                   and (geometry != "spherical" or "_m1.0_" in r.filename)]
+        if not records:
+            raise SkipModelError(f"No {geometry} models available for chemistry={keyw_chem}")
         if not records:
             raise ValueError(f"No models available for chemistry={keyw_chem!r}.")
 
@@ -562,7 +585,7 @@ EOF
 
         sgn_logg = self._sign_char(selected.logg)
         logg_abs = f"{abs(selected.logg):.2f}"
-        name_model = f"T{int(round(selected.teff))}_G{sgn_logg}{logg_abs}"
+        name_model = f"T{int(round(selected.teff))}_G{sgn_logg}{logg_abs}_{selected.filename[:-4]}"
 
         print(" Teff    : ", f"{selected.teff:.0f}", "K")
         print(" logg    : ", f"{selected.logg:.2f}", "dex")

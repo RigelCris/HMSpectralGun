@@ -92,3 +92,39 @@ parallel_spectralgun /path/to/input.ts
 
 - `main.py` and `main_parallel.py` no longer depend on machine-specific hardcoded paths.
 - `line_fit_config.example.json` now uses relative placeholder paths and must be adapted to your dataset.
+
+### Geometria dei modelli MARCS
+
+In `input.ts`, dopo `NLTE=...` e prima delle righe degli spettri, è possibile
+aggiungere `geometry=plane-parallel`, `geometry=spherical` oppure `geometry=auto`.
+Il parametro vale per tutto il file e funziona sia con `interp=True` sia con
+`interp=Nearest`, in `main.py` e `main_parallel.py`.
+
+```ini
+ExplicitModel=False
+interp=True
+NLTE=False
+geometry=plane-parallel
+```
+
+La prima keyword accetta sia `ExplicitModel=False` sia la forma storica
+`Explicit=False`.
+
+Se omesso, il valore è `auto`: piano-parallelo per la gravità richiesta
+`log g >= 4`, sferico sotto 4. Questa è una convenzione del programma;
+la scelta esplicita permette di ignorare la soglia. Con modelli espliciti,
+`auto` rispetta invece la geometria del file, mentre una scelta incompatibile
+produce un errore.
+
+L'interpolazione usa otto modelli della stessa geometria, senza extrapolazione
+né ripiego sull'altra geometria. I modelli sferici restano limitati a 1 massa
+solare. La microturbolenza atmosferica è quella disponibile più vicina nella
+griglia, come in precedenza, e può differire dalla microturbolenza della sintesi.
+Se per quella microturbolenza manca il cubo locale, l'interpolazione è rifiutata.
+La geometria passata a Turbospectrum viene letta dall'atmosfera effettiva
+(`ppINTERPOL`, `sphINTERPOL` o intestazione MARCS), non dedotta dalla gravità.
+
+I nomi dei nuovi modelli e spettri distinguono la geometria per evitare il
+riutilizzo di risultati precedenti incompatibili. Gli output esistenti non
+vengono rigenerati automaticamente. Per mescolare geometrie forzate usare
+file di input separati; non è prevista una colonna per riga.

@@ -8,6 +8,7 @@ Created on Fri Oct 23 10:02:47 2020
 
 import numpy as np
 import os
+import re
 
 class LineListManager:
     """
@@ -35,9 +36,18 @@ class LineListManager:
         Returns:
             list: La nuova lista di righe contenente solo dati molecolari.
         """
+        # File names are not uniform across molecular databases.  In
+        # particular the optical CN isotopologue files are named C12N14,
+        # C12N15, C13N14 and C13N15 rather than containing the string "CN".
+        aliases = {
+            'CN': ('CN', 'C12N', 'C13N'),
+            'CO': ('CO',),
+            'OH': ('OH',),
+        }
+        patterns = aliases.get(keyv[2], (keyv[2],))
         new_linespec = []
         for line in linespec:
-            if keyv[2] in line:
+            if any(pattern in line for pattern in patterns):
                 new_linespec.append(line)
         return new_linespec
 
@@ -63,23 +73,38 @@ class LineListManager:
             if tmp_tag is None:
                 tmp_tag = f"p{os.getpid()}"
 
+            header_re = re.compile(
+                r"^'\s*(?P<atomic>\d+(?:\.\d+)?)\s*'\s+"
+                r"(?P<ion>\d+)\s+(?P<count>\d+)"
+            )
+            target_atomic = float(atomic_n)
+            target_ion = int(atomic_ion)
             new_linespec = []
             for valdfile in valdlist:
                 with open(os.path.join(linelist_path, valdfile), "r") as f:
                     datavald = f.readlines()
 
-                n_start, n_lines = 0, 0
-                for n in range(len(datavald)):
-                    if datavald[n][0:2] == "' " and datavald[n][3:9] == atomic_n and datavald[n][26:27] == atomic_ion:
-                        n_start = n
-                        n_lines = int(datavald[n][32:43]) + 2
+                lines_w = []
+                for n, line in enumerate(datavald):
+                    match = header_re.match(line)
+                    if match is None:
+                        continue
+                    if (
+                        float(match.group('atomic')) == target_atomic
+                        and int(match.group('ion')) == target_ion
+                    ):
+                        n_lines = int(match.group('count')) + 2
+                        lines_w.extend(datavald[n:n + n_lines])
+
+                # A species need not occur in every wavelength segment. Do
+                # not pass empty temporary files to Turbospectrum.
+                if not lines_w:
+                    continue
 
                 newfile = f'tmp_{tmp_tag}_{valdfile[:-5]}.{elem}'
-                lines_w = datavald[n_start:n_start + n_lines]
 
                 with open(os.path.join(linelist_path, newfile), "w") as file:
-                    for line in lines_w:
-                        file.write(f'{line} ')
+                    file.writelines(lines_w)
 
                 new_linespec.append(newfile)
 
