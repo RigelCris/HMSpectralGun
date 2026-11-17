@@ -236,7 +236,7 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
             header.create_combined_header(namefile, model=model, met=df.at[k, '[Fe/H]'], alpha=df.at[k, '[a/Fe]'], elem=elem,
                                           deltaabu=deltaabu, lam_min=df.at[k, 'lam_i'], lam_max=df.at[k, 'lam_f'],
                                           xi=df.at[k, 'xi'], isotopic_n=isotopic_n, isotopic_val=isotopic_val,
-                                          keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'resnum'], log_filename=log_filename)
+                                          keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'resnum'])
             end = time.time()
             if verbose:
                 params.print_time(end - start)
@@ -247,8 +247,7 @@ def main(k=0, show_progress=False, verbose=False, pbar=None):
                 header.create_combined_header(namefile, model=model, met=df.at[k, '[Fe/H]'], alpha=df.at[k, '[a/Fe]'], elem=elem,
                                               deltaabu=deltaabu, lam_min=df.at[k, 'lam_i'], lam_max=df.at[k, 'lam_f'],
                                               xi=df.at[k, 'xi'], isotopic_n=isotopic_n, isotopic_val=isotopic_val,
-                                              keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'sampl'], res=df.at[k, 'RES'],
-                                              log_filename=log_filename)
+                                              keyw=df.at[k, 'chemistry'], deltalam=df.at[k, 'sampl'], res=df.at[k, 'RES'])
             except (ValueError, FileNotFoundError):
                 if verbose:
                     print('ERROR IN COMPUTING SPECTRUM!!!!!!')
