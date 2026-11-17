@@ -398,9 +398,36 @@ class ModelMaker:
         )
 
     # Function to select models for interpolation
+    def _load_interpolation_models(self, keyw_chem: str) -> List[ModelRecord]:
+        """Bridge alpha-poor MARCS models to the solar standard node at [Fe/H]=0.
+
+        MARCS ap ends at -0.25, while st at zero has the same solar-scaled
+        mixture. Keep original filenames and do not include metal-poor st
+        models, whose standard mixture is alpha-enhanced. Other chemistry
+        requests and nearest-model selection retain their existing behavior.
+        See https://marcs.astro.uu.se/docs.html (abundance-mixture tables).
+        """
+        if keyw_chem != "ap":
+            return self._load_models(keyw_chem)
+
+        records = []
+        for record in self._load_models():
+            if record.chem == "ap":
+                records.append(record)
+            elif record.chem == "st" and self._same(record.met, 0.0):
+                # Compact MARCS names may omit the abundance tags. When
+                # present, reject any explicitly non-solar abundance ratio.
+                ratios = re.findall(
+                    r"_(?:a|c|n|o|r|s)([+-]?\d+(?:\.\d+)?)(?=_|\.mod$)",
+                    record.filename,
+                )
+                if all(self._same(float(value), 0.0) for value in ratios):
+                    records.append(record)
+        return records
+
     def select_models_for_interpolation(self, Teff, logg, met, xi, keyw_chem):
         geometry = resolve_geometry(self.geometry, logg)
-        records = [r for r in self._load_models(keyw_chem) if r.geometry == geometry
+        records = [r for r in self._load_interpolation_models(keyw_chem) if r.geometry == geometry
                    and (geometry != "spherical" or "_m1.0_" in r.filename)]
         if not records:
             raise SkipModelError(f"No {geometry} models available for chemistry={keyw_chem}")

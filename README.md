@@ -90,6 +90,15 @@ parallel_spectralgun /path/to/input.ts
 
 ## Notes
 
+- Per una griglia solar-scaled usare `ap` per `[Fe/H] < 0` e `st` per
+  `[Fe/H] >= 0`, con `[a/Fe]=0` e un file abbondanze con `[X/Fe]=0`.
+  L'interpolazione delle richieste `ap` include anche i nodi `st` a
+  `[Fe/H]=0`, che hanno la stessa miscela solar-scaled: permette quindi
+  richieste come -0.2 e -0.1 fra `ap` a -0.25 e `st` a 0. I nomi MARCS
+  originali sono conservati. Le richieste `st` negative mantengono invece
+  la miscela standard, alpha-enhanced. La selezione `Nearest` non cambia.
+  Riferimento: https://marcs.astro.uu.se/docs.html.
+
 - `main.py` and `main_parallel.py` no longer depend on machine-specific hardcoded paths.
 - `line_fit_config.example.json` now uses relative placeholder paths and must be adapted to your dataset.
 
